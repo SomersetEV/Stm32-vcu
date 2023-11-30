@@ -21,7 +21,6 @@
  */
 #ifndef CAN_OI_H
 #define CAN_OI_H
-#include <libopencm3/stm32/crc.h>
 #include <stdint.h>
 #include "my_fp.h"
 #include "inverter.h"
@@ -29,7 +28,7 @@
 class Can_OI: public Inverter
 {
 public:
-   void Task100Ms() {};
+   void Task100Ms();
    void DecodeCAN(int, uint32_t*);
    void SetTorque(float torquePercent);
    float GetMotorTemperature() { return motor_temp; }

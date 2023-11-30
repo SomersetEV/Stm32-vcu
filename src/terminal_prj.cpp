@@ -74,25 +74,22 @@ static void PrintList(Terminal* t, char *arg)
    }
 }
 
-static void PrintAtr(Terminal* term, char *arg)
+static void PrintAtr(Terminal* t, char *arg)
 {
    const Param::Attributes *pAtr;
 
    arg = arg;
-   term = term;
 
-   printf("Parameter attributes\r\n");
-   printf("Name\t\tmin - max [default]\r\n");
+   fprintf(t, "Parameter attributes\r\n");
+   fprintf(t, "Name\t\tmin - max [default]\r\n");
 
    for (uint32_t idx = 0; idx < Param::PARAM_LAST; idx++)
    {
       pAtr = Param::GetAttrib((Param::PARAM_NUM)idx);
       /* Only display for params */
-      if ((Param::GetType((Param::PARAM_NUM)idx) == Param::TYPE_PARAM ||
-           Param::GetType((Param::PARAM_NUM)idx) == Param::TYPE_TESTPARAM) &&
-          (Param::GetFlag((Param::PARAM_NUM)idx) & Param::FLAG_HIDDEN) == 0)
+      if (Param::IsParam((Param::PARAM_NUM)idx) && (Param::GetFlag((Param::PARAM_NUM)idx) & Param::FLAG_HIDDEN) == 0)
       {
-         printf("%s\t\t%f - %f [%f]\r\n", pAtr->name,pAtr->min,pAtr->max,pAtr->def);
+         fprintf(t, "%s\t\t%f - %f [%f]\r\n", pAtr->name,pAtr->min,pAtr->max,pAtr->def);
       }
    }
 }

@@ -78,6 +78,7 @@ static SimpBMS BMSsimp;
 static DaisychainBMS BMSdaisychain;
 static BMS* selectedBMS = &BMSnone;
 static Can_OBD2 canOBD2;
+static DiscoGearSelector DiscoGear;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void Ms200Task(void)
@@ -323,7 +324,6 @@ static void Ms10Task(void)
    selectedVehicle->SetTemperatureGauge(Param::GetFloat(Param::tmphs));
    selectedVehicle->Task10Ms();
    if(opmode==MOD_CHARGE) selectedCharger->Task10Ms();
-   if(opmode==MOD_RUN) Param::SetInt(Param::canctr, (Param::GetInt(Param::canctr) + 1) & 0xF);//Update the OI can counter in RUN mode only
 
    //////////////////////////////////////////////////
    //            MODE CONTROL SECTION              //
@@ -487,6 +487,10 @@ static void UpdateVehicle()
       case SUBARU:
          selectedVehicle = &subaruVehicle;
          break;
+      case DISCO:
+         selectedVehicle = &DiscoGear;
+         break;
+
    }
    //This will call SetCanFilters() via the Clear Callback
    canInterface[0]->ClearUserMessages();
@@ -692,7 +696,7 @@ void Param::Change(Param::PARAM_NUM paramNum)
 }
 
 
-static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) //This is where we go when a defined CAN message is received.
+static bool CanCallback(uint32_t id, uint32_t data[2]) //This is where we go when a defined CAN message is received.
 {
    switch (id)
    {
@@ -787,10 +791,9 @@ extern "C" int main(void)
    DigIo::mcp_sby.Clear();//enable can3
 
    Terminal t(USART3, TermCmds);
-//   FunctionPointerCallback canCb(CanCallback, SetCanFilters);
+   FunctionPointerCallback canCb(CanCallback, SetCanFilters);
    Stm32Can c(CAN1, CanHardware::Baud500);
    Stm32Can c2(CAN2, CanHardware::Baud500, true);
-   FunctionPointerCallback cb(CanCallback, SetCanFilters);
    Stm32Can *CanMapDev = &c;
    if (Param::GetInt(Param::CanMapCan) == 0) {
       CanMapDev = &c;
@@ -798,18 +801,15 @@ extern "C" int main(void)
       CanMapDev = &c2;
    }
    CanMap cm(CanMapDev);
-   CanSdo sdo(&c, &cm);
-   sdo.SetNodeId(3);//id 3 for vcu?
+
    // Set up CAN 1 callback and messages to listen for
- //  c.AddReceiveCallback(&canCb);
- //  c2.AddReceiveCallback(&canCb);
-   canInterface[0] = &c;
-   canInterface[1] = &c2;
-   c.AddCallback(&cb);
-   c2.AddCallback(&cb);
+   c.AddReceiveCallback(&canCb);
+   c2.AddReceiveCallback(&canCb);
    TerminalCommands::SetCanMap(&cm);
    canMap = &cm;
 
+   canInterface[0] = &c;
+   canInterface[1] = &c2;
    CanHardware* shunt_can = canInterface[Param::GetInt(Param::ShuntCan)];
 
    canOBD2.SetCanInterface(canInterface[Param::GetInt(Param::OBD2Can)]);
@@ -838,14 +838,7 @@ extern "C" int main(void)
    Param::SetInt(Param::opmode, MOD_OFF);//always off at startup
 
    while(1)
-   {
-      char c = 0;
       t.Run();
-      if (sdo.GetPrintRequest() == PRINT_JSON)
-      {
-         TerminalCommands::PrintParamsJson(&sdo, &c);
-      }
-   }
 
    return 0;
 }
