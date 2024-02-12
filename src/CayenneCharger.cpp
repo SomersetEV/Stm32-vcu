@@ -32,7 +32,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
   switch(chgmode)
     {
    case Unused:
-   if (MaxACAmps > 0 && RunCh)
+   if (carwakeup == 1 && RunCh)
    {
        clearToStart=true;
        return true;
@@ -58,7 +58,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
     break;
 
     case Chademo:
-   if (HVK_BMS_Sollmodus == 4 && RunCh)
+   if (carwakeup == 1 && RunCh)
    {
        clearToStart=true;
        return true;
@@ -225,7 +225,10 @@ void CayenneCharger::LockCP()
 
     case 0x12DD5472: // HVLM_10
         CayenneCharger::handle12DD5472(data);
+      break;
 
+    case 0x1B000044: //NMH_Ladegaeraet. Wake signal
+        CayenneCharger::handle1B000044(data);
       break;
   }
 
@@ -274,10 +277,12 @@ void CayenneCharger::handle564(uint32_t data[2])
    uint8_t* bytes = (uint8_t*)data;// arrgghhh this converts the two 32bit array into bytes.
       mode = ((bytes[1] >> 4) & (0x07U));
       ACvoltage = ((bytes[2] & (0xFFU)) << 1) | ((bytes[1] >> 7) & (0x01U));
+      Param::SetFloat(Param::AC_Volts , ACvoltage);
       HVVoltage = (((bytes[4] & (0x03U)) << 8) | (bytes[3] & (0xFFU)));
       current = ((((bytes[5] & (0x0FU)) << 6) | ((bytes[4] >> 2) & (0x3FU))) * 0.2) - 102;
       LAD_Status_Voltage = ((bytes[5] >> 4) & (0x03U));
       temperature = bytes[6] - 40;
+      Param::SetFloat(Param::ChgTemp , temperature);
       LAD_PowerLossVal = ((bytes[7] & (0xFFU))) * 20;
 
 }
@@ -329,6 +334,14 @@ void CayenneCharger::handle12DD5472(uint32_t data[2])
       HVLM_RtmWarnLadeKommunikation = (bytes[5] & (0x07U));
 }
 
+void CayenneCharger::handle1B000044(uint32_t data[2])
+
+{
+      uint8_t* bytes = (uint8_t*)data;// arrgghhh this converts the two 32bit array into bytes.
+    carwakeup = bytes[7];
+}
+
+
 
    void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
 {
@@ -343,7 +356,13 @@ void CayenneCharger::handle12DD5472(uint32_t data[2])
  // BMS_Min_Batt_Volt = (battery_status.BMSMinVolt);
  // BMS_Min_Batt_Volt_Discharge = (battery_status.BMSMinVolt);
   //BMS Limits Charge:
-  if(clearToStart) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim); // only charge when clear to start
+  if(clearToStart)
+  {
+      if(actVolts<Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr++;
+      if(actVolts>=Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr--;
+      if(BMS_MaxCharge_Curr>=GetInt(Param::BMS_ChargeLim)) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim);//clamp to max of BMS charge limit
+  }
+
   else
   {
    BMS_MaxCharge_Curr = 0;

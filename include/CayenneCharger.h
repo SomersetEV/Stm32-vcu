@@ -31,6 +31,7 @@ void handle53C(uint32_t data[2]); // 1
 void handle564(uint32_t data[2]); //1
 void handle565(uint32_t data[2]); //1
 void handle67E(uint32_t data[2]); //1
+void handle1B000044(uint32_t data[2]); //1
 void handle12DD5472(uint32_t data[2]); //1
 void msg3C0(); // 1
 void msg1A1();      // BMS_02     0x1A1  1
@@ -178,6 +179,7 @@ bool BMS_Status_ServiceDisconnect;
 uint8_t BMS_HV_Status;
 bool BMS_Faultstatus;
 int BMS_IstModus;
+int carwakeup;
 uint16_t BMS_Batt_Ah;
 uint16_t BMS_Target_SOC_HiRes;
 

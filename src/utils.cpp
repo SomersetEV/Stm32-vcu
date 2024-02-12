@@ -239,7 +239,7 @@ float ProcessUdc(int motorSpeed)
 if (Param::GetInt(Param::Type) == 0)
 {
    float udc = ((float)ISA::Voltage)/1000;//get voltage from isa sensor and post to parameter database
-   Param::SetFloat(Param::udc, Param::INVudc);
+   Param::SetFloat(Param::udc, udc);
    float udc2 = ((float)ISA::Voltage2)/1000;//get voltage from isa sensor and post to parameter database
    Param::SetFloat(Param::udc2, udc2);
    float udc3 = ((float)ISA::Voltage3)/1000;//get voltage from isa sensor and post to parameter database
