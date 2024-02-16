@@ -17,6 +17,7 @@ bool ControlCharge(bool RunCh, bool ACReq);
 bool parked = false;
 bool locked = false;
 void DecodeCAN(int id, uint32_t data[2]);
+void SetCanInterface(CanHardware* c);
 
 private:
 int opmode;

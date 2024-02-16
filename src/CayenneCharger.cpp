@@ -32,7 +32,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
   switch(chgmode)
     {
    case Unused:
-   if (carwakeup == 1 && RunCh)
+   if (HVLM_Plug_Status > 1 && RunCh)
    {
        clearToStart=true;
        return true;
@@ -58,7 +58,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
     break;
 
     case Chademo:
-   if (carwakeup == 1 && RunCh)
+   if (HVLM_Plug_Status > 1 && RunCh)
    {
        clearToStart=true;
        return true;
@@ -198,6 +198,19 @@ void CayenneCharger::LockCP()
   ZV_entriegeln_Anf = 0;
   FCU_TK_Freigabe_Tankklappe = 0;
 }
+
+void CayenneCharger::SetCanInterface(CanHardware* c)
+{
+   can = c;
+   can->RegisterUserMessage(0x488);
+   can->RegisterUserMessage(0x53C);
+   can->RegisterUserMessage(0x564);
+   can->RegisterUserMessage(0x565);
+   can->RegisterUserMessage(0x67E);
+   can->RegisterUserMessage(0x12DD5472);
+   can->RegisterUserMessage(0x1B000044);
+}
+
 
    void CayenneCharger::DecodeCAN(int id, uint32_t data[2])
 {
