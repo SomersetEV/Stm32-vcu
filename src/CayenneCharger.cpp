@@ -216,6 +216,9 @@ void CayenneCharger::SetCanInterface(CanHardware* c)
 {
   switch (id)
   {
+    case 0x1B000044: //NMH_Ladegaeraet. Wake signal
+        CayenneCharger::handle1B000044(data);
+      break;
     case 0x488: // HVLM_06
      CayenneCharger::handle488(data);
       break;
@@ -238,10 +241,6 @@ void CayenneCharger::SetCanInterface(CanHardware* c)
 
     case 0x12DD5472: // HVLM_10
         CayenneCharger::handle12DD5472(data);
-      break;
-
-    case 0x1B000044: //NMH_Ladegaeraet. Wake signal
-        CayenneCharger::handle1B000044(data);
       break;
   }
 
@@ -351,7 +350,8 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
 
 {
       uint8_t* bytes = (uint8_t*)data;// arrgghhh this converts the two 32bit array into bytes.
-    carwakeup = bytes[7];
+    carwakeup = bytes[6];
+
 }
 
 
@@ -371,14 +371,17 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
   //BMS Limits Charge:
   if(clearToStart)
   {
+      chargeractive = 1;
       if(actVolts<Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr++;
       if(actVolts>=Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr--;
+      if(BMS_MaxCharge_Curr>32) BMS_MaxCharge_Curr = 32; //clamp max amps to 32amps
       if(BMS_MaxCharge_Curr>=GetInt(Param::BMS_ChargeLim)) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim);//clamp to max of BMS charge limit
   }
 
   else
   {
    BMS_MaxCharge_Curr = 0;
+   chargeractive = 0;
   }
 
   HVEM_SollStrom_HV = 50;
