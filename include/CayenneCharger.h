@@ -40,6 +40,7 @@ void msg64F();      // BCM1_04    0x64F  1
 void msg663();      // NVEM_02    0x663  11
 void msg191();      // BMS_01     0x191  1
 void msg503();      // HVK_01     0x503  1
+void msg39D();      // BMS_03     0x39D
 void UnLockCP(); // 1
 void LockCP(); // 1
 static void canRX_488(); // HVLM_06

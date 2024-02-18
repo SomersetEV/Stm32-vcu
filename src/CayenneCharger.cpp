@@ -86,6 +86,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
     msg3C0(); //  Klemmen_Status_01
   msg503(); // HVK_01     0x503
   msg1A1(); // BMS_02   0x1A1
+  msg39D();
   CalcValues100ms();
     }
    //messages with no CRC counter
@@ -182,6 +183,20 @@ void CayenneCharger::msg3C0() // Klemmen_Status_01
   can->Send(0x3C0, (uint32_t*)bytes, 8);
   vag_cnt3C0++;
   if (vag_cnt3C0 > 0x0f) vag_cnt3C0 = 0x00;
+}
+
+void CayenneCharger::msg39D() // Klemmen_Status_01
+{
+  uint8_t bytes[8];
+  bytes[0] = BMS_03[0];
+  bytes[1] = BMS_03[1];
+  bytes[2] = BMS_03[2];
+  bytes[3] = BMS_03[3];
+  bytes[4] = BMS_03[4];
+  bytes[5] = BMS_03[5];
+  bytes[6] = BMS_03[6];
+  bytes[7] = BMS_03[7];
+  can->Send(0x39D, (uint32_t*)bytes, 8);
 }
    void CayenneCharger::UnLockCP()
 {
