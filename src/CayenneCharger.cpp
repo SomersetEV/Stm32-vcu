@@ -386,8 +386,8 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
 
   HVEM_SollStrom_HV = 50;
   BMS_MaxCharge_Curr_Offset = 0;
-  BMS_Batt_Max_Volt = GetInt(Param::Voltspnt);  //(HVDCSetpnt);
-  BMS_Min_Batt_Volt_Charge = GetInt(Param::Voltspnt) - 200;
+  BMS_Batt_Max_Volt = 382;  //(HVDCSetpnt);
+  BMS_Min_Batt_Volt_Charge = 280;
  // BMS_OpenCircuit_Volts = (BMSBattCellSumx10) / 10;
 
 
