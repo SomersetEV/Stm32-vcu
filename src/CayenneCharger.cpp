@@ -86,7 +86,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
     msg3C0(); //  Klemmen_Status_01
   msg503(); // HVK_01     0x503
   msg1A1(); // BMS_02   0x1A1
-  msg39D();
+  //msg39D();
   CalcValues100ms();
     }
    //messages with no CRC counter
@@ -376,34 +376,34 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
   // Runtime Values:
   BMS_Batt_Curr = (current + 2047);
 
- // BMS_SOC_HiRes = (battery_status.SOCx10) * 2;
- // BMS_SOC_Kaltstart = (battery_status.SOCx10) * 2;
+ BMS_SOC_HiRes = (SOCx10) * 2;
+ BMS_SOC_Kaltstart = (SOCx10) * 2;
 
   //BMS Limits Discharge:
   BMS_MaxDischarge_Curr = 1500;
- // BMS_Min_Batt_Volt = (battery_status.BMSMinVolt);
- // BMS_Min_Batt_Volt_Discharge = (battery_status.BMSMinVolt);
+  BMS_Min_Batt_Volt = 0;
+  BMS_Min_Batt_Volt_Discharge = 0;
   //BMS Limits Charge:
+  if(actVolts<Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr++;
+  if(actVolts>=Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr--;
+  if(BMS_MaxCharge_Curr>32) BMS_MaxCharge_Curr = 32; //clamp max amps to 32amps
+  if(BMS_MaxCharge_Curr>=GetInt(Param::BMS_ChargeLim)) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim);//clamp to max of BMS charge limit
+
   if(clearToStart)
   {
       chargeractive = 1;
-      if(actVolts<Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr++;
-      if(actVolts>=Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr--;
-      if(BMS_MaxCharge_Curr>32) BMS_MaxCharge_Curr = 32; //clamp max amps to 32amps
-      if(BMS_MaxCharge_Curr>=GetInt(Param::BMS_ChargeLim)) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim);//clamp to max of BMS charge limit
   }
 
   else
   {
-   BMS_MaxCharge_Curr = 0;
    chargeractive = 0;
   }
 
   HVEM_SollStrom_HV = 50;
   BMS_MaxCharge_Curr_Offset = 0;
   BMS_Batt_Max_Volt = 382;  //(HVDCSetpnt);
-  BMS_Min_Batt_Volt_Charge = 280;
- // BMS_OpenCircuit_Volts = (BMSBattCellSumx10) / 10;
+  BMS_Min_Batt_Volt_Charge = 0;
+  BMS_OpenCircuit_Volts = 0;
 
 
   //BMS_Status_ServiceDisconnect = (battery_status.HVIL_Open);
@@ -459,7 +459,7 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
     HV_Bordnetz_aktiv = true; // Indicates an active high-voltage vehicle electrical system: 0 = Not Active,  1 = Active
     HVK_BMS_Sollmodus = 4;
     BMS_IstModus = 4; // 0=Standby, 1=HV Active (Driving) 2=Balancing 4=AC charge, 6=DC charge, 7=init
-    BMS_HV_Status = 2; // HV System Voltage Detected  // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
+    BMS_HV_Status = 1; // HV System Voltage Detected  // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
     HVK_MO_EmSollzustand = 50;
     BMS_Charger_Active = 1;
     BMS_Batt_Volt = 400 * 4;
@@ -476,7 +476,7 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
     HV_Bordnetz_aktiv = false; // Indicates an active high-voltage vehicle electrical system: 0 = Not Active,  1 = Active
     HVK_BMS_Sollmodus = 0;
     BMS_IstModus = 0; // 0=Standby, 1=HV Active (Driving) 2=Balancing 4=AC charge, 6=DC charge, 7=init
-    BMS_HV_Status = 1; // HV No Voltage // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
+    BMS_HV_Status = 0; // HV No Voltage // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
     HVK_MO_EmSollzustand = 50;
     BMS_Charger_Active = 0;
     BMS_Batt_Volt = (HVVoltage) * 4;
