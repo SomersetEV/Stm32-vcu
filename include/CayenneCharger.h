@@ -24,6 +24,7 @@ int opmode;
 void Task10Ms();
 void Task100Ms();
 void CalcValues100ms();
+int stopcharge = 0;
 static void handle377(uint32_t data[2]);
 static void handle389(uint32_t data[2]);
 static void handle38A(uint32_t data[2]);
@@ -32,6 +33,7 @@ void handle53C(uint32_t data[2]); // 1
 void handle564(uint32_t data[2]); //1
 void handle565(uint32_t data[2]); //1
 void handle67E(uint32_t data[2]); //1
+void handle111(uint32_t data[2]); //1
 void handle1B000044(uint32_t data[2]); //1
 void handle12DD5472(uint32_t data[2]); //1
 void msg3C0(); // 1
@@ -41,6 +43,9 @@ void msg663();      // NVEM_02    0x663  11
 void msg191();      // BMS_01     0x191  1
 void msg503();      // HVK_01     0x503  1
 void msg39D();      // BMS_03     0x39D
+void msg111();      // stop charge message
+void msg184();      // 
+void msg17B();      // 
 void UnLockCP(); // 1
 void LockCP(); // 1
 static void canRX_488(); // HVLM_06
@@ -193,6 +198,7 @@ uint16_t BMS_Max_Wh;
 uint16_t BMS_BattEnergy_Wh_HiRes;
 uint16_t BMS_MaxBattEnergy_Wh_HiRes;
 uint16_t BMS_SOC;
+uint16_t SOCx10 = 351;
 uint16_t BMS_ResidualEnergy_Wh;
 
 uint16_t BMS_SOC_ChargeLim;

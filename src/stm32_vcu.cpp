@@ -49,6 +49,7 @@ hours=0, minutes=0, seconds=0,
 alarm=0;			// != 0 when alarm is pending
 
 // Instantiate Classes
+static Bmw_E31 e31Vehicle;
 static BMWE65 e65Vehicle;
 static Can_E39 e39Vehicle;
 static Can_VAG vagVehicle;
@@ -66,18 +67,28 @@ static FCChademo chademoFC;
 static i3LIMClass LIMFC;
 static Can_OI openInv;
 static OutlanderInverter outlanderInv;
-static CayenneCharger CayChg;
 static noHeater Heaternone;
 static AmperaHeater amperaHeater;
+static no_Lever NoGearLever;
+static F30_Lever F30GearLever;
 static Inverter* selectedInverter = &openInv;
 static Vehicle* selectedVehicle = &vagVehicle;
 static Heater* selectedHeater = &Heaternone;
 static Chargerhw* selectedCharger = &chargerPDM;
 static Chargerint* selectedChargeInt = &UnUsed;
+static Shifter* selectedShifter = &NoGearLever;
 static BMS BMSnone;
 static SimpBMS BMSsimp;
 static DaisychainBMS BMSdaisychain;
+static DCDC DCDCnone;
+static TeslaDCDC DCDCTesla;
 static BMS* selectedBMS = &BMSnone;
+static DCDC* selectedDCDC = &DCDCnone;
+static Can_OBD2 canOBD2;
+static Shifter shifterNone;
+static CayenneCharger CayChg;
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void Ms200Task(void)
@@ -125,6 +136,22 @@ static void Ms200Task(void)
    if(ChgSet==0 && !ChgLck) RunChg=true;//enable from webui if we are not locked out from an auto termination
    if(ChgSet==1) RunChg=false;//disable from webui
 
+  //Handle PP on the Charging port
+   if(Param::GetInt(Param::GPA1Func) == IOMatrix::PILOT_PROX || Param::GetInt(Param::GPA2Func) == IOMatrix::PILOT_PROX ) {
+      int ppThresh = Param::GetInt(Param::ppthresh);
+
+      int ppValue = IOMatrix::GetAnaloguePin(IOMatrix::PILOT_PROX)->Get();
+      Param::SetInt(Param::PPVal, ppValue);
+
+
+      //if PP is less than threshold and currently disabled and not already finished
+      if (ppValue < ppThresh && ChgSet==1 && !ChgLck) {
+         RunChg=true;
+      } else if (ppValue > ppThresh) {
+         //even if timer was enabled, change to disabled, we've unplugged
+         RunChg=false;
+      }
+   }
 
    if(selectedCharger->ControlCharge(RunChg, ACrequest) && (opmode != MOD_RUN))
    {
@@ -169,7 +196,25 @@ static void Ms200Task(void)
 
 
    }
-   if(opmode==MOD_RUN) ChgLck=false;//reset charge lockout flag when we drive off
+   if(opmode==MOD_RUN) {
+      ChgLck=false;//reset charge lockout flag when we drive off
+
+      //Brake Vac Sensor
+      if(Param::GetInt(Param::GPA1Func) == IOMatrix::VAC_SENSOR || Param::GetInt(Param::GPA2Func) == IOMatrix::VAC_SENSOR ) {
+         int brkVacThresh = Param::GetInt(Param::BrkVacThresh);
+         int BrkVacHyst = Param::GetInt(Param::BrkVacHyst);
+
+         int brkVacVal = IOMatrix::GetAnaloguePin(IOMatrix::VAC_SENSOR)->Get();
+         Param::SetInt(Param::BrkVacVal, brkVacVal);
+
+         //enable pump
+         if (brkVacVal > brkVacThresh) {
+            IOMatrix::GetPin(IOMatrix::BRAKEVACPUMP)->Clear();
+         } else if (brkVacVal < BrkVacHyst) {
+            IOMatrix::GetPin(IOMatrix::BRAKEVACPUMP)->Set();
+         }
+      }
+   }
 
 }
 
@@ -181,7 +226,7 @@ static void Ms100Task(void)
    Param::SetFloat(Param::cpuload, cpuLoad);
    Param::SetInt(Param::lasterr, ErrorMessage::GetLastError());
    int opmode = Param::GetInt(Param::opmode);
-   utils::SelectDirection(selectedVehicle);
+   utils::SelectDirection(selectedVehicle , selectedShifter);
    utils::CalcSOC();
 
    Param::SetInt(Param::cruisestt, selectedVehicle->GetCruiseState());
@@ -193,6 +238,8 @@ static void Ms100Task(void)
    selectedVehicle->Task100Ms();
    selectedCharger->Task100Ms();
    selectedBMS->Task100Ms();
+   selectedDCDC->Task100Ms();
+   selectedShifter->Task100Ms();
    canMap->SendAll();
 
 
@@ -246,11 +293,7 @@ static void Ms100Task(void)
 
    }
 
-   if(targetChgint != ChargeInterfaces::Chademo) //If we are not using Chademo then gp in can be used as a cabin heater request from the vehicle
-   {
-      Param::SetInt(Param::HeatReq,DigIo::gp_12Vin.Get());
-   }
-
+   Param::SetInt(Param::HeatReq,IOMatrix::GetPin(IOMatrix::HEATREQ)->Get());
 }
 
 static void ControlCabHeater(int opmode)
@@ -326,7 +369,10 @@ static void Ms10Task(void)
    selectedVehicle->SetRevCounter(ABS(Param::GetInt(Param::speed)));
    selectedVehicle->SetTemperatureGauge(Param::GetFloat(Param::tmphs));
    selectedVehicle->Task10Ms();
+   selectedDCDC->Task10Ms();
+   selectedShifter->Task10Ms();
    if(opmode==MOD_CHARGE) selectedCharger->Task10Ms();
+   if(opmode==MOD_RUN) Param::SetInt(Param::canctr, (Param::GetInt(Param::canctr) + 1) & 0xF);//Update the OI can counter in RUN mode only
 
    //////////////////////////////////////////////////
    //            MODE CONTROL SECTION              //
@@ -399,6 +445,7 @@ switch (opmode)
 
    case MOD_PCHFAIL:
       StartSig=false;
+      DigIo::prec_out.Clear();//explicitly turn off precharge relay in a fail condition
       if(initbyCharge && !chargeMode) opmode = MOD_OFF;//only go to off if the signal from charge or vehicle start is removed
       if(initbyStart && !selectedVehicle->Ready()) opmode = MOD_OFF;//this avoids oscillation in the event of a precharge system failure
       Param::SetInt(Param::opmode, opmode);
@@ -434,6 +481,8 @@ static void Ms1Task(void)
    selectedVehicle->Task1Ms();
    selectedCharger->Task1Ms();
    selectedChargeInt->Task1Ms();
+   selectedShifter->Task1Ms();
+   selectedDCDC->Task1Ms();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -490,6 +539,10 @@ static void UpdateVehicle()
       case SUBARU:
          selectedVehicle = &subaruVehicle;
          break;
+     case BMW_E31:
+         selectedVehicle = &e31Vehicle;
+         break;
+
    }
    //This will call SetCanFilters() via the Clear Callback
    canInterface[0]->ClearUserMessages();
@@ -521,7 +574,7 @@ static void UpdateCharger()
       case ChargeModes::Out_lander:
       selectedCharger = &outChg;
          break;
-         case ChargeModes::Cayenne:
+      case ChargeModes::Cayenne:
       selectedCharger = &CayChg;
          break;
 
@@ -537,7 +590,7 @@ static void UpdateChargeInt()
    switch (Param::GetInt(Param::interface))
    {
       case ChargeInterfaces::Unused:
-//      selectedChargeInt = &nochg;
+      selectedChargeInt = &UnUsed;
          break;
       case ChargeInterfaces::Chademo:
       selectedChargeInt = &chademoFC;
@@ -592,6 +645,54 @@ static void UpdateBMS()
    canInterface[1]->ClearUserMessages();
 }
 
+static void UpdateDCDC()
+{
+      selectedBMS->DeInit();
+      switch (Param::GetInt(Param::DCdc_Type))
+      {
+         case DCDCModes::NoDCDC:
+            selectedDCDC = &DCDCnone;
+            break;
+
+        case DCDCModes::TeslaG2:
+            selectedDCDC = &DCDCTesla;
+            break;
+
+         default:
+            // Default to no DCDC
+            selectedDCDC = &DCDCnone;
+            break;
+      }
+   //This will call SetCanFilters() via the Clear Callback
+   canInterface[0]->ClearUserMessages();
+   canInterface[1]->ClearUserMessages();
+}
+
+
+static void UpdateShifter()
+{
+
+      switch (Param::GetInt(Param::GearLvr))
+      {
+         case ShifterModes::NoShifter:
+            selectedShifter = &shifterNone;
+            break;
+
+        case ShifterModes::BMWF30:
+            selectedShifter = &F30GearLever;
+            break;
+
+         default:
+            // Default to no shifter
+            selectedShifter = &shifterNone;
+            break;
+      }
+   //This will call SetCanFilters() via the Clear Callback
+   canInterface[0]->ClearUserMessages();
+   canInterface[1]->ClearUserMessages();
+}
+
+
 //Whenever the user clears mapped can messages or changes the
 //CAN interface of a device, this will be called by the CanHardware module
 static void SetCanFilters()
@@ -602,12 +703,17 @@ static void SetCanFilters()
    CanHardware* lim_can = canInterface[Param::GetInt(Param::LimCan)];
    CanHardware* charger_can = canInterface[Param::GetInt(Param::ChargerCan)];
    CanHardware* bms_can = canInterface[Param::GetInt(Param::BMSCan)];
+   CanHardware* obd2_can = canInterface[Param::GetInt(Param::OBD2Can)];
+   CanHardware* dcdc_can = canInterface[Param::GetInt(Param::DCDCCan)];
 
    selectedInverter->SetCanInterface(inverter_can);
    selectedVehicle->SetCanInterface(vehicle_can);
    selectedCharger->SetCanInterface(charger_can);
    selectedChargeInt->SetCanInterface(lim_can);
    selectedBMS->SetCanInterface(bms_can);
+   selectedDCDC->SetCanInterface(dcdc_can);
+   selectedShifter->SetCanInterface(vehicle_can);
+   canOBD2.SetCanInterface(obd2_can);
 
    if (Param::GetInt(Param::Type) == 0)  ISA::RegisterCanMessages(shunt_can);//select isa shunt
    if (Param::GetInt(Param::Type) == 1)  SBOX::RegisterCanMessages(shunt_can);//select bmw sbox
@@ -638,6 +744,12 @@ void Param::Change(Param::PARAM_NUM paramNum)
    case Param::BMS_Mode:
       UpdateBMS();
       break;
+   case Param::DCdc_Type:
+      UpdateDCDC();
+      break;
+   case Param::GearLvr:
+      UpdateShifter();
+      break;
    case Param::InverterCan:
    case Param::VehicleCan:
    case Param::ShuntCan:
@@ -649,6 +761,16 @@ void Param::Change(Param::PARAM_NUM paramNum)
    case Param::CAN3Speed:
       CANSPI_Initialize();// init the MCP25625 on CAN3
       CANSPI_ENRx_IRQ();  //init CAN3 Rx IRQ
+      break;
+   case Param::Tim3_Presc:
+   case Param::Tim3_Period:
+   case Param::Tim3_1_OC:
+   case Param::Tim3_2_OC:
+   case Param::Tim3_3_OC:
+   case Param::PWM1Func:
+   case Param::PWM2Func:
+   case Param::PWM3Func:
+      tim3_setup();
       break;
    default:
       break;
@@ -683,14 +805,18 @@ void Param::Change(Param::PARAM_NUM paramNum)
    ChgSet = Param::GetInt(Param::Chgctrl);//0=enable,1=disable,2=timer.
    ChgTicks = (GetInt(Param::Chg_Dur)*300);//number of 200ms ticks that equates to charge timer in minutes
    IOMatrix::AssignFromParams();
+   IOMatrix::AssignFromParamsAnalogue();
 }
 
 
-static bool CanCallback(uint32_t id, uint32_t data[2]) //This is where we go when a defined CAN message is received.
+static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) //This is where we go when a defined CAN message is received.
 {
+   dlc = dlc;
    switch (id)
    {
-
+      case 0x7DF:
+        canOBD2.DecodeCAN(id,data);
+        break;
 
    default:
    if (Param::GetInt(Param::Type) == 0)  ISA::DecodeCAN(id, data);
@@ -701,6 +827,8 @@ static bool CanCallback(uint32_t id, uint32_t data[2]) //This is where we go whe
       selectedCharger->DecodeCAN(id, data);
       selectedChargeInt->DecodeCAN(id, data);
       selectedBMS->DecodeCAN(id, (uint8_t*)data);
+      selectedDCDC->DecodeCAN(id, (uint8_t*)data);
+      selectedShifter->DecodeCAN(id,data);
       break;
    }
    return false;
@@ -779,20 +907,32 @@ extern "C" int main(void)
    DigIo::mcp_sby.Clear();//enable can3
 
    Terminal t(USART3, TermCmds);
-   FunctionPointerCallback canCb(CanCallback, SetCanFilters);
+//   FunctionPointerCallback canCb(CanCallback, SetCanFilters);
    Stm32Can c(CAN1, CanHardware::Baud500);
    Stm32Can c2(CAN2, CanHardware::Baud500, true);
-   CanMap cm(&c);
-
+   FunctionPointerCallback cb(CanCallback, SetCanFilters);
+   Stm32Can *CanMapDev = &c;
+   if (Param::GetInt(Param::CanMapCan) == 0) {
+      CanMapDev = &c;
+   } else {
+      CanMapDev = &c2;
+   }
+   CanMap cm(CanMapDev);
+   CanSdo sdo(&c, &cm);
+   sdo.SetNodeId(3);//id 3 for vcu?
    // Set up CAN 1 callback and messages to listen for
-   c.AddReceiveCallback(&canCb);
-   c2.AddReceiveCallback(&canCb);
+ //  c.AddReceiveCallback(&canCb);
+ //  c2.AddReceiveCallback(&canCb);
+   canInterface[0] = &c;
+   canInterface[1] = &c2;
+   c.AddCallback(&cb);
+   c2.AddCallback(&cb);
    TerminalCommands::SetCanMap(&cm);
    canMap = &cm;
 
-   canInterface[0] = &c;
-   canInterface[1] = &c2;
    CanHardware* shunt_can = canInterface[Param::GetInt(Param::ShuntCan)];
+
+   canOBD2.SetCanInterface(canInterface[Param::GetInt(Param::OBD2Can)]);
 
    CANSPI_Initialize();// init the MCP25625 on CAN3
    CANSPI_ENRx_IRQ();  //init CAN3 Rx IRQ
@@ -803,6 +943,8 @@ extern "C" int main(void)
    UpdateChargeInt();
    UpdateBMS();
    UpdateHeater();
+   UpdateDCDC();
+   UpdateShifter();
 
    Stm32Scheduler s(TIM4); //We never exit main so it's ok to put it on stack
    scheduler = &s;
@@ -818,7 +960,14 @@ extern "C" int main(void)
    Param::SetInt(Param::opmode, MOD_OFF);//always off at startup
 
    while(1)
+   {
+      char c = 0;
       t.Run();
+      if (sdo.GetPrintRequest() == PRINT_JSON)
+      {
+         TerminalCommands::PrintParamsJson(&sdo, &c);
+      }
+   }
 
    return 0;
 }

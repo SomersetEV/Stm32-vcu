@@ -84,12 +84,16 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
 
     {
     msg3C0(); //  Klemmen_Status_01
-  msg503(); // HVK_01     0x503
-  msg1A1(); // BMS_02   0x1A1
-  //msg39D();
-  CalcValues100ms();
+    msg503(); // HVK_01     0x503
+    msg1A1(); // BMS_02   0x1A1
+    msg184(); // ZV_01    0x184
+    msg17B(); // FCU_02   0x17B
+    //msg39D();
+    CalcValues100ms();
     }
    //messages with no CRC counter
+
+
    void CayenneCharger::msg191() // BMS_01   0x191
 {
     uint8_t bytes[8];
@@ -105,6 +109,36 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
   can->Send(0x191, (uint32_t*)bytes, 8);
   vag_cnt191++;
   if (vag_cnt191 > 0x0f) vag_cnt191 = 0x00;
+}
+
+void CayenneCharger::msg17B() // FCU_02   0x17B
+{
+   uint8_t bytes[8];
+    bytes[0] = FCU_02[0] ;
+    bytes[1] = FCU_02[1] ;
+    bytes[2] = FCU_02[2] ;
+    bytes[3] = FCU_02[3] ;
+    bytes[4] = FCU_02[4] ;
+    bytes[5] = FCU_02[5] ;
+    bytes[6] = FCU_02[6] ;
+    bytes[7] = FCU_02[7] ;
+    can->Send( 0x17B, (uint32_t*)bytes, 8);
+
+}
+
+void CayenneCharger::msg184() // ZV_01   0x184
+{
+    uint8_t bytes[8];
+    bytes[0] = 0x00 ;
+    bytes[1] = (ZV_01[1]|vag_cnt184) ;
+    bytes[2] = ZV_01[2] ;
+    bytes[3] = ZV_01[3] ;
+    bytes[4] = ZV_01[4] ;
+    bytes[5] = ZV_01[5] ;
+    bytes[6] = ZV_01[6] ;
+    bytes[7] = ZV_01[7] ;
+    bytes[0] = vw_crc_calc(bytes, 8, 0x184);
+    can->Send( 0x184, (uint32_t*)bytes, 8);
 }
 
    void CayenneCharger::msg1A1() // BMS_02   0x1A1
@@ -222,6 +256,7 @@ void CayenneCharger::SetCanInterface(CanHardware* c)
    can->RegisterUserMessage(0x564);
    can->RegisterUserMessage(0x565);
    can->RegisterUserMessage(0x67E);
+   can->RegisterUserMessage(0x111);
    can->RegisterUserMessage(0x12DD5472);
    can->RegisterUserMessage(0x1B000044);
 }
@@ -256,6 +291,10 @@ void CayenneCharger::SetCanInterface(CanHardware* c)
 
     case 0x12DD5472: // HVLM_10
         CayenneCharger::handle12DD5472(data);
+      break;
+
+    case 0x111: //stop charge message
+      CayenneCharger::handle111(data);
       break;
   }
 
@@ -369,10 +408,22 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
 
 }
 
+void CayenneCharger::handle111(uint32_t data[2])
+
+{
+      uint8_t* bytes = (uint8_t*)data;// arrgghhh this converts the two 32bit array into bytes.
+    stopcharge = bytes[0];
+
+}
 
 
    void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
 {
+  //stop charging
+  if (stopcharge ==1){
+    UnLockCP();
+  }
+  
   // Runtime Values:
   BMS_Batt_Curr = (current + 2047);
 
@@ -388,7 +439,13 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
   if(actVolts>=Param::GetInt(Param::Voltspnt)) BMS_MaxCharge_Curr--;
   if(BMS_MaxCharge_Curr>32) BMS_MaxCharge_Curr = 32; //clamp max amps to 32amps
   if(BMS_MaxCharge_Curr>=GetInt(Param::BMS_ChargeLim)) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim);//clamp to max of BMS charge limit
-
+  
+  //stop charging
+  if (stopcharge ==1){
+    BMS_MaxCharge_Curr = 0;
+    chargeractive = 0;
+    UnLockCP();
+  }
   if(clearToStart)
   {
       chargeractive = 1;
@@ -421,7 +478,7 @@ void CayenneCharger::handle1B000044(uint32_t data[2])
 //  BMS_Max_Wh = (battery_status.CapkWhx10 * 2);
   BMS_BattEnergy_Wh_HiRes = 0;
   BMS_MaxBattEnergy_Wh_HiRes = 0;
-  //BMS_SOC = (battery_status.SOCx10) / 5;
+  BMS_SOC = 30;
   BMS_ResidualEnergy_Wh = 0;
 
   //BMS_SOC_ChargeLim = (battery_status.SOC_Targetx10) / 10;

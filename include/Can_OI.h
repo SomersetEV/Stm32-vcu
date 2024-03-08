@@ -21,6 +21,7 @@
  */
 #ifndef CAN_OI_H
 #define CAN_OI_H
+#include <libopencm3/stm32/crc.h>
 #include <stdint.h>
 #include "my_fp.h"
 #include "inverter.h"
@@ -35,7 +36,7 @@ public:
    float GetInverterTemperature() { return inv_temp; }
    float GetInverterVoltage() { return voltage; }
    float GetMotorSpeed() { return speed; }
-   int GetInverterState() { return error; }
+   int GetInverterState();
    void SetCanInterface(CanHardware* c);
 
 private:
@@ -48,6 +49,7 @@ private:
    static uint8_t run100ms;
    static uint32_t lastRecv;
    static int16_t final_torque_request;
+
 };
 
 #endif // CAN_OI_H

@@ -37,6 +37,7 @@
 #include "errormessage.h"
 #include "printf.h"
 #include "stm32scheduler.h"
+#include "cansdo.h"
 #include "leafinv.h"
 #include "isa_shunt.h"
 #include "Can_E39.h"
@@ -67,16 +68,24 @@
 #include "notused.h"
 #include "nocharger.h"
 #include "extCharger.h"
-#include "amperaCharger.h"
+#include "amperacharger.h"
 #include "noHeater.h"
 #include "bms.h"
 #include "simpbms.h"
 #include "daisychainbms.h"
 #include "outlanderCharger.h"
+#include "Can_OBD2.h"
+#include "dcdc.h"
+#include "TeslaDCDC.h"
+#include "BMW_E31.h"
+#include "shifter.h"
+#include "F30_Lever.h"
+#include "no_Lever.h"
 #include "CayenneCharger.h"
 
-
 #define PRECHARGE_TIMEOUT 5  //5s
+
+#define PRINT_JSON 0
 
 typedef union {
     struct {

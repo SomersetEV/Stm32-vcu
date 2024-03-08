@@ -45,7 +45,7 @@ int16_t q12;
 void VWBOX::RegisterCanMessages(CanHardware* can)
 {
    can->RegisterUserMessage(0x0BB);//VWBOX MSG
-   can->RegisterUserMessage(0x1DA);//leaf inv message
+
 
 }
 
@@ -53,7 +53,7 @@ void VWBOX::DecodeCAN(int id, uint32_t data[2])
 {
    switch (id)
    {
-   case 0x1DA:
+   case 0x0BB:
       VWBOX::handle0BB(data);//VWBOX CAN MESSAGE
       break;
 
@@ -67,7 +67,7 @@ void VWBOX::handle0BB(uint32_t data[2])  //VWBOX Current and voltages
    uint8_t* bytes = (uint8_t*)data;// arrgghhh this converts the two 32bit array into bytes. See comments are useful:)
    q12 = (((bytes[2])<<4) | ((bytes[1])>>4));
    Amperes=(q12&0x0800)?(q12|0xF800):q12;//Step1: Copy , Step2: Paste , Step3: Profit!
-   Voltage=(bytes[0] << 2) | (bytes[1] >> 6);;//output voltage
+   Voltage=((bytes[5] << 4) | ((bytes[4]>>4)&0xF));//output voltage
    Voltage2=(((bytes[4]&0xF)<<8) | (bytes[3]));//battery voltage
 }
 
