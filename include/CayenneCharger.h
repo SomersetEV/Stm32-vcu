@@ -23,6 +23,7 @@ private:
 int opmode;
 void Task10Ms();
 void Task100Ms();
+void Task200Ms();
 void CalcValues100ms();
 int stopcharge = 0;
 static void handle377(uint32_t data[2]);
@@ -46,6 +47,7 @@ void msg39D();      // BMS_03     0x39D
 void msg111();      // stop charge message
 void msg184();      // 
 void msg17B();      // 
+void msg583(); // ZV_02
 void UnLockCP(); // 1
 void LockCP(); // 1
 static void canRX_488(); // HVLM_06

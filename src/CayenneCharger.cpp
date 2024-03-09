@@ -32,7 +32,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
   switch(chgmode)
     {
    case Unused:
-   if (HVLM_Plug_Status > 1 && RunCh)
+   if (HVLM_Plug_Status > 1 && RunCh && stopcharge == 0)
    {
        clearToStart=true;
        return true;
@@ -88,8 +88,13 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
     msg1A1(); // BMS_02   0x1A1
     msg184(); // ZV_01    0x184
     msg17B(); // FCU_02   0x17B
-    //msg39D();
+    msg39D();
     CalcValues100ms();
+    }
+void CayenneCharger::Task200Ms()
+
+    {
+    msg583();
     }
    //messages with no CRC counter
 
@@ -110,6 +115,22 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
   vag_cnt191++;
   if (vag_cnt191 > 0x0f) vag_cnt191 = 0x00;
 }
+
+
+void CayenneCharger::msg583() // ZV_02 200ms
+{
+    uint8_t bytes[8];
+    bytes[0] = ZV_02[0] ;
+    bytes[1] = ZV_02[1] ;
+    bytes[2] = ZV_02[2] ;
+    bytes[3] = ZV_02[3] ;
+    bytes[4] = ZV_02[4] ;
+    bytes[5] = ZV_02[5] ;
+    bytes[6] = ZV_02[6] ;
+    bytes[7] = ZV_02[7] ;
+    can->Send(0x583, (uint32_t*)bytes, 8);
+}
+
 
 void CayenneCharger::msg17B() // FCU_02   0x17B
 {
@@ -419,10 +440,7 @@ void CayenneCharger::handle111(uint32_t data[2])
 
    void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
 {
-  //stop charging
-  if (stopcharge ==1){
-    UnLockCP();
-  }
+  
   
   // Runtime Values:
   BMS_Batt_Curr = (current + 2047);
@@ -441,11 +459,12 @@ void CayenneCharger::handle111(uint32_t data[2])
   if(BMS_MaxCharge_Curr>=GetInt(Param::BMS_ChargeLim)) BMS_MaxCharge_Curr = GetInt(Param::BMS_ChargeLim);//clamp to max of BMS charge limit
   
   //stop charging
-  if (stopcharge ==1){
+  if (stopcharge == 1){
     BMS_MaxCharge_Curr = 0;
-    chargeractive = 0;
     UnLockCP();
   }
+
+
   if(clearToStart)
   {
       chargeractive = 1;
