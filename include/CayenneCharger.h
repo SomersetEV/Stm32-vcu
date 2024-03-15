@@ -34,7 +34,7 @@ void handle53C(uint32_t data[2]); // 1
 void handle564(uint32_t data[2]); //1
 void handle565(uint32_t data[2]); //1
 void handle67E(uint32_t data[2]); //1
-void handle111(uint32_t data[2]); //1
+void handle415(uint32_t data[2]); //1
 void handle1B000044(uint32_t data[2]); //1
 void handle12DD5472(uint32_t data[2]); //1
 void msg3C0(); // 1
@@ -44,10 +44,11 @@ void msg663();      // NVEM_02    0x663  11
 void msg191();      // BMS_01     0x191  1
 void msg503();      // HVK_01     0x503  1
 void msg39D();      // BMS_03     0x39D
-void msg111();      // stop charge message
+void msg415();      // stop charge message
 void msg184();      // 
 void msg17B();      // 
 void msg583(); // ZV_02
+void msg552(); //  HVEM_05
 void UnLockCP(); // 1
 void LockCP(); // 1
 static void canRX_488(); // HVLM_06
