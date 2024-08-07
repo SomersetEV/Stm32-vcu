@@ -91,6 +91,7 @@ static Chargerint* selectedChargeInt = &UnUsed;
 static Shifter* selectedShifter = &NoGearLever;
 static BMS BMSnone;
 static SimpBMS BMSsimp;
+static PSA50kWhBMS BMSPSA50kWh; 
 static DaisychainBMS BMSdaisychain;
 static DCDC DCDCnone;
 static TeslaDCDC DCDCTesla;
@@ -722,6 +723,10 @@ static void UpdateBMS()
     case BMSModes::BMSModeDaisychainDualBMS:
         selectedBMS = &BMSdaisychain;
         break;
+    case BMSModes::BMSModePSA50kWhBMS:
+        selectedBMS = &BMSPSA50kWh;
+        break;
+
     default:
         // Default to no BMS
         selectedBMS = &BMSnone;
