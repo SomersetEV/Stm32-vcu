@@ -1,7 +1,7 @@
 /*
- * This file is part of the Zombieverter project.
+ * This file is part of the tumanako_vc project.
  *
- * Copyright (C) 2023 Damien Maguire
+ * Copyright (C) 2018 Johannes Huebner <dev@johanneshuebner.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,26 +15,22 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * Based on the work of Tom de Bree : https://github.com/Tom-evnut/BMW-F-Series-Shifter
- * All credits to the Orignal Reverse engineering work and documenation
- * Project Gus and a forum post from Bimmerwelt
- * Based on info from https://openinverter.org/wiki/BMW_F-Series_Gear_Lever
  */
+#ifndef NOVEHICLE_H_INCLUDED
+#define NOVEHICLE_H_INCLUDED
 
-#ifndef no_Lever_h
-#define no_Lever_h
+#include <vehicle.h>
 
-#include "shifter.h"
 
-class no_Lever: public Shifter
+class NoVehicle : public Vehicle
 {
 public:
-
-private:
+   void SetRevCounter(int speed) {speed = speed;}
+   void SetTemperatureGauge(float temp){temp = temp;}
+   bool Ready() { return DigIo::t15_digi.Get();}
+   bool Start() { return Param::GetBool(Param::din_start); }
+protected:
 
 };
 
-
-#endif // F30_Lever_INCLUDED
-
+#endif // VEHICLE_H_INCLUDED

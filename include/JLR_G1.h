@@ -22,19 +22,28 @@
  * Based on info from https://openinverter.org/wiki/BMW_F-Series_Gear_Lever
  */
 
-#ifndef no_Lever_h
-#define no_Lever_h
+#ifndef JLR_G1_h
+#define JLR_G1_h
 
 #include "shifter.h"
 
-class no_Lever: public Shifter
+class JLR_G1: public Shifter
 {
 public:
 
-private:
 
+   void Task10Ms();
+   void Task100Ms();
+   void DecodeCAN(int, uint32_t*);
+   bool GetGear(Shifter::Sgear& outGear);//if shifter class knows gear return true and set dir
+   void SetCanInterface(CanHardware* c);
+
+private:
+   void sendcan();
+   Shifter::Sgear gear;
 };
 
 
-#endif // F30_Lever_INCLUDED
+#endif
+
 

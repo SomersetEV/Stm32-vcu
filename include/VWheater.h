@@ -1,7 +1,7 @@
 /*
- * This file is part of the Zombieverter project.
+ * This file is part of the Zombieverter VCU project.
  *
- * Copyright (C) 2023 Damien Maguire
+ * Copyright (C) 2018 Johannes Huebner <dev@johanneshuebner.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,26 +15,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * Based on the work of Tom de Bree : https://github.com/Tom-evnut/BMW-F-Series-Shifter
- * All credits to the Orignal Reverse engineering work and documenation
- * Project Gus and a forum post from Bimmerwelt
- * Based on info from https://openinverter.org/wiki/BMW_F-Series_Gear_Lever
+ * Controls the VW LIN based heater as : https://openinverter.org/wiki/Volkswagen_Heater
  */
+#ifndef VWHEATER_H
+#define VWHEATER_H
 
-#ifndef no_Lever_h
-#define no_Lever_h
+//#include <libopencm3/stm32/usart.h>
+#include <heater.h>
+#include "linbus.h"
 
-#include "shifter.h"
 
-class no_Lever: public Shifter
+class vwHeater : public Heater
 {
-public:
+   public:
+      void SetTargetTemperature(float temp) { (void)temp; } //Not supported (yet)?
+      void SetPower(uint16_t power, bool HeatReq);
+      void SetLinInterface(LinBus* l);
 
-private:
-
+   private:
+      bool isAwake=false;
+      LinBus* lin;
 };
 
-
-#endif // F30_Lever_INCLUDED
-
+#endif // VWHEATER_H

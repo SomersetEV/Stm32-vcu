@@ -1,7 +1,7 @@
 /*
- * This file is part of the Zombieverter project.
+ * This file is part of the stm32-vcu project.
  *
- * Copyright (C) 2023 Damien Maguire
+ * Copyright (C) 2021 Damien Maguire
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,43 +16,43 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef BMW_E31_h
-#define BMW_E31_h
+#ifndef BMW_E39_h
+#define BMW_E39_h
 
-/*  This library supports the BMW E31 8 series. Will include some EGS/DME Can and driving analog instruments
+/*  This library supports the Powertrain CAN messages for the BMW E39 for driving dash gauges, putting out malf lights etc
 
 */
 
 #include <stdint.h>
 #include "vehicle.h"
-#include "digio.h"
-#include "utils.h"
-#include "stm32_can.h"
 
-class BMW_E31: public Vehicle
+
+class BMW_E39: public Vehicle
 {
 
 public:
    void SetCanInterface(CanHardware* c);
    void Task10Ms();
    void Task100Ms();
-   void Task1Ms();
-   void SetRevCounter(int s);
+   void SetRevCounter(int s) { speed = s; }
    void SetTemperatureGauge(float temp);
    void DecodeCAN(int id, uint32_t* data);
    bool Ready();
    bool Start();
-
+   void SetE46(bool e46) { isE46 = e46; }
 
 private:
-   uint16_t speed;
-   uint32_t timerPeriod;
-   bool timerIsRunning=false;
-   void EGSMsg43F(int8_t gear);
-   void EGSMsg43B();
+   void Msg316();
+   void Msg329();
+   void Msg545();
+   void Msg43F(int8_t gear);
+   void Msg43B();
 
+   uint16_t speed;
+   bool isE46;
+   bool AbsCANalive;
+   bool SendCAN;
 };
 
-#endif /* BMW_E31_h */
-
+#endif /* Can_E39_h */
 

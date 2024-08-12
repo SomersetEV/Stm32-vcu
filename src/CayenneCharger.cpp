@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2021-2023  Johannes Huebner <dev@johanneshuebner.com>
  * 	                        Damien Maguire <info@evbmw.com>
+ * 2024 Ben Bament - Somerset EV
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,7 +31,7 @@ bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq)
   switch(chgmode)
     {
    case Unused:
-   if (HVLM_Plug_Status == 3 && RunCh)
+   if (HVLM_Plug_Status > 1 && RunCh)
    {
        clearToStart=true;
        return true;
@@ -826,6 +827,3 @@ void CayenneCharger::handle415(uint32_t data[2])
   EM_HYB_11[2] = (0x00 & (0x07U)) | ((EM1_Status_Spgfreiheit & (0x03U)) << 3) | ((0x00 & (0x01U)) << 5);
 
 }
-
-
-
