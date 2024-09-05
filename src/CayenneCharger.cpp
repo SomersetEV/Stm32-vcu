@@ -277,6 +277,7 @@ void CayenneCharger::msg39D() // Klemmen_Status_01
   ZV_entriegeln_Anf = 1;
   FCU_TK_Freigabe_Tankklappe = 1;
   ZV_verriegelt_extern_ist = 0;
+  ZV_verriegelt_soll = 1;
 }
 void CayenneCharger::LockCP()
 {
@@ -486,7 +487,7 @@ void CayenneCharger::handle415(uint32_t data[2])
   }
   else
   {
-    LockCP();
+    //LockCP();
   }
 
 
@@ -812,7 +813,7 @@ void CayenneCharger::handle415(uint32_t data[2])
   // ZV_02[4] = (HD_Hauptraste & (0x01U)) | ((HD_Vorraste & (0x01U)) << 1) | ((FFB_CarFinder & (0x01U)) << 6) | ((FFB_Komfortoeffnen & (0x01U)) << 7);
   // ZV_02[5] = (FFB_Komfortschliessen & (0x01U)) | ((ZV_Schluessel_Zugang & (0x0FU)) << 2) | ((ZV_SafeFunktion_aktiv & (0x01U)) << 6) | ((FBS_Warn_Schluessel_Batt & (0x01U)) << 7);
   // ZV_02[6] = (ZV_Oeffnungsmodus & (0x03U)) | ((HFS_verriegelt & (0x01U)) << 2) | ((HFS_gesafet & (0x01U)) << 3) | ((HBFS_verriegelt & (0x01U)) << 4) | ((HBFS_gesafet & (0x01U)) << 5) | ((ZV_ist_Zustand_verfuegbar & (0x01U)) << 6) | ((IRUE_Taster_Fkts_LED & (0x01U)) << 7);
-  // ZV_02[7] = (ZV_Tankklappe_offen & (0x01U)) | ((ZV_Rollo_auf & (0x01U)) << 1) | ((ZV_Rollo_zu & (0x01U)) << 2) | ((ZV_SAD_auf & (0x01U)) << 3) | ((ZV_SAD_zu & (0x01U)) << 4) | ((BCM_Tankklappensteller_Fehler & (0x01U)) << 5) | ((ZV_verriegelt_soll & (0x03U)) << 6);
+   ZV_02[7] = (ZV_Tankklappe_offen & (0x01U)) | ((ZV_Rollo_auf & (0x01U)) << 1) | ((ZV_Rollo_zu & (0x01U)) << 2) | ((ZV_SAD_auf & (0x01U)) << 3) | ((ZV_SAD_zu & (0x01U)) << 4) | ((BCM_Tankklappensteller_Fehler & (0x01U)) << 5) | ((ZV_verriegelt_soll & (0x03U)) << 6);
 
   // FCU_02[1] = ((FCU_Warn_H2_Konzentrat_Motorraum & (0x07U)) << 4) | ((FCU_nicht_verfuegbar & (0x01U)) << 7);
   // FCU_02[2] = (FCU_Startstopp_Anforderung & (0x0FU)) | ((FCU_HV_Anf & (0x03U)) << 4) | ((FCU_Klima_Eingr & (0x03U)) << 6);
