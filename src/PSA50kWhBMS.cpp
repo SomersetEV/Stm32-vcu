@@ -488,8 +488,8 @@ void PSA50kWhBMS::Task100Ms() {
   
   PSA50kWhBMS::findlowestcelltemp();
   PSA50kWhBMS::findhighestcelltemp();
-  minTempC = lowestTemp - 50;
-  maxTempC = highestTemp - 50;
+  minTempC = lowestTemp - 40;
+  maxTempC = highestTemp - 40;
 
    if(BMSDataValid()) {
       Param::SetFloat(Param::BMS_Vmin, minCellV);
