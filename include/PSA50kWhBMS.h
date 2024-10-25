@@ -37,6 +37,8 @@ class PSA50kWhBMS: public BMS
       bool ChargeAllowed();
       int chargeCurrentLimit = 0;
       int timeoutCounter = 0;
+      float current = 0;
+      float SoCValue;
       int Cell1v, Cell2v, Cell3v, Cell4v, Cell5v, Cell6v, Cell7v, Cell8v, Cell9v, Cell10v;
       int Cell11v, Cell12v, Cell13v, Cell14v, Cell15v, Cell16v, Cell17v, Cell18v, Cell19v, Cell20v;
       int Cell21v, Cell22v, Cell23v, Cell24v, Cell25v, Cell26v, Cell27v, Cell28v, Cell29v, Cell30v;

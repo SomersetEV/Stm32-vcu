@@ -32,7 +32,8 @@ void PSA50kWhBMS::SetCanInterface(CanHardware* c)
    can = c;
   can->RegisterUserMessage(0x6E0, 0x700);
   //can->RegisterUserMessage(0x6E0, 0x6E7);
-  can->RegisterUserMessage(0x6D1, 0x6D5);  
+  can->RegisterUserMessage(0x6D1, 0x6D5); 
+  can->RegisterUserMessage(0x125); 
 //can->RegisterUserMessage(0x6E2);
 
 //can->RegisterUserMessage(0x6D4);
@@ -467,6 +468,18 @@ Cell51t = data[4];
 Cell52t = data[5];
 Cell53t = data[6];
 Cell54t = data[7];
+   timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
+
+   break;
+
+   case 0x125:
+  SoCValue = (data[0] << 8) | data[1];
+  Param::SetFloat(Param::SOC,SoCValue);
+  Current = data[2];
+   if (Param::GetIntParam::ShuntType) == 0//Only populate if no shunt is used
+   {
+  Param::SetFloat(Param::idc,Current);
+   }
    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
 
    break;
