@@ -475,7 +475,9 @@ Cell54t = data[7];
    case 0x125:
   SoCValue = (data[0] << 8) | data[1];
   Param::SetFloat(Param::SOC,SoCValue);
-  Current = data[2];
+  //battery_voltage = (rx_frame.data.u8[3] << 8) | rx_frame.data.u8[4];
+  Current = (data[5] - 0x58) << 8 | data[2];
+  Current = (Current/256) * 10;
    if (Param::GetIntParam::ShuntType) == 0//Only populate if no shunt is used
    {
   Param::SetFloat(Param::idc,Current);
