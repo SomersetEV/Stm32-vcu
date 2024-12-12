@@ -1,6 +1,7 @@
 /*
  * This file is part of the ZombieVerter project.
  *
+ * Copyright (C) 2024 Tom de Bree <tom@voltinflux.com>
  * Copyright (C) 2010 Johannes Huebner <contact@johanneshuebner.com>
  * Copyright (C) 2010 Edward Cheeseman <cheesemanedward@gmail.com>
  * Copyright (C) 2009 Uwe Hermann <uwe@hermann-uwe.de>
@@ -19,7 +20,93 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "stm32_vcu.h"
+#include <stdint.h>
+#include <libopencm3/stm32/usart.h>
+#include <libopencm3/stm32/timer.h>
+#include <libopencm3/stm32/rtc.h>
+#include <libopencm3/stm32/can.h>
+#include <libopencm3/stm32/iwdg.h>
+#include <libopencm3/stm32/spi.h>
+#include <libopencm3/stm32/exti.h>
+#include "stm32_can.h"
+#include "terminal.h"
+#include "params.h"
+#include "hwdefs.h"
+#include "digio.h"
+#include "hwinit.h"
+#include "anain.h"
+#include "temp_meas.h"
+#include "param_save.h"
+#include "my_math.h"
+#include "errormessage.h"
+#include "printf.h"
+#include "stm32scheduler.h"
+#include "cansdo.h"
+#include "leafinv.h"
+#include "isa_shunt.h"
+#include "BMW_E39.h"
+#include "BMW_E65.h"
+#include "subaruvehicle.h"
+#include "Can_OI.h"
+#include "outlanderinverter.h"
+#include "Can_VAG.h"
+#include "GS450H.h"
+#include "throttle.h"
+#include "utils.h"
+#include "teslaCharger.h"
+#include "i3LIM.h"
+#include "CANSPI.h"
+#include "chademo.h"
+#include "heater.h"
+#include "amperaheater.h"
+#include "inverter.h"
+#include "vehicle.h"
+#include "chargerhw.h"
+#include "canmap.h"
+#include "terminalcommands.h"
+#include "iomatrix.h"
+#include "bmw_sbox.h"
+#include "vag_sbox.h"
+#include "NissanPDM.h"
+#include "chargerint.h"
+#include "notused.h"
+#include "nocharger.h"
+#include "extCharger.h"
+#include "amperacharger.h"
+#include "noHeater.h"
+#include "bms.h"
+#include "simpbms.h"
+#include "leafbms.h"
+#include "daisychainbms.h"
+#include "outlanderCharger.h"
+#include "Can_OBD2.h"
+#include "dcdc.h"
+#include "TeslaDCDC.h"
+#include "BMW_E31.h"
+#include "shifter.h"
+#include "digipot.h"
+#include "F30_Lever.h"
+#include "E65_Lever.h"
+#include "JLR_G1.h"
+#include "JLR_G2.h"
+#include "no_Lever.h"
+#include "CPC.h"
+#include "Focci.h"
+#include "NoInverter.h"
+#include "linbus.h"
+#include "VWheater.h"
+#include "ElconCharger.h"
+#include "rearoutlanderinverter.h"
+#include "NoVehicle.h"
+#include "V_Classic.h"
+#include "kangoobms.h"
+#include "OutlanderCanHeater.h"
+#include "OutlanderHeartBeat.h"
+
+#define PRECHARGE_TIMEOUT 5  //5s
+
+#define PRINT_JSON 0
+
 
 extern "C" void __cxa_pure_virtual()
 {
@@ -44,14 +131,14 @@ static bool StartSig=false;
 static bool ACrequest=false;
 static bool initbyStart=false;
 static bool initbyCharge=false;
-
+static bool OutlanderCAN=false;
 
 static volatile unsigned
 days=0,
 hours=0, minutes=0, seconds=0,
 alarm=0;			// != 0 when alarm is pending
 
-static uint8_t rlyDly=25;
+static uint16_t rlyDly=25;
 
 // Instantiate Classes
 static BMW_E31 e31Vehicle;
@@ -72,17 +159,21 @@ static outlanderCharger outChg;
 static FCChademo chademoFC;
 static i3LIMClass LIMFC;
 static CPCClass CPCcan;
+static FocciClass Foccican;
 static Can_OI openInv;
 static NoInverterClass NoInverter;
 static OutlanderInverter outlanderInv;
 static noHeater Heaternone;
 static AmperaHeater amperaHeater;
+static OutlanderCanHeater outlanderCanHeater;
 static no_Lever NoGearLever;
 static F30_Lever F30GearLever;
+static E65_Lever E65GearLever;
 static JLR_G1 JLRG1shift;
 static JLR_G2 JLRG2shift;
 static vwHeater heaterVW;
 static NoVehicle VehicleNone;
+static V_Classic classVehicle;
 static Inverter* selectedInverter = &openInv;
 static Vehicle* selectedVehicle = &VehicleNone;
 static Heater* selectedHeater = &Heaternone;
@@ -91,8 +182,10 @@ static Chargerint* selectedChargeInt = &UnUsed;
 static Shifter* selectedShifter = &NoGearLever;
 static BMS BMSnone;
 static SimpBMS BMSsimp;
-static PSA50kWhBMS BMSPSA50kWh; 
+static LeafBMS BMSleaf;
+static PSA50kWhBMS BMSPSA50kWh;
 static DaisychainBMS BMSdaisychain;
+static KangooBMS BMSRenaultKangoo33;
 static DCDC DCDCnone;
 static TeslaDCDC DCDCTesla;
 static BMS* selectedBMS = &BMSnone;
@@ -109,6 +202,9 @@ static void Ms200Task(void)
 
     selectedVehicle->Task200Ms();
     if(opmode==MOD_CHARGE) selectedCharger->Task200Ms();
+
+    //if(opmode==MOD_CHARGE) utils::CpSpoofOutput;
+    utils::CpSpoofOutput();
 
     Param::SetInt(Param::Day,days);
     Param::SetInt(Param::Hour,hours);
@@ -183,7 +279,7 @@ static void Ms200Task(void)
     //in chademo , we do not want to run the 200ms task unless in dc charge mode
     if(targetChgint == ChargeInterfaces::Chademo && chargeModeDC) selectedChargeInt->Task200Ms();
     //In case of the LIM we want to send it all the time if lim in use
-    if((targetChgint == ChargeInterfaces::i3LIM) || (targetChgint == ChargeInterfaces::Unused) || (targetChgint == ChargeInterfaces::CPC)) selectedChargeInt->Task200Ms();
+    if((targetChgint == ChargeInterfaces::i3LIM) || (targetChgint == ChargeInterfaces::Unused) || (targetChgint == ChargeInterfaces::CPC)|| (targetChgint == ChargeInterfaces::Focci)) selectedChargeInt->Task200Ms();
     //and just to be thorough ...
     if(targetChgint == ChargeInterfaces::Unused) selectedChargeInt->Task200Ms();
 
@@ -270,7 +366,11 @@ static void Ms100Task(void)
     Param::SetInt(Param::lasterr, ErrorMessage::GetLastError());
     int opmode = Param::GetInt(Param::opmode);
     utils::SelectDirection(selectedVehicle, selectedShifter);
-    utils::CalcSOC();
+
+    if(Param::GetInt(Param::ShuntType) != 0)//Do not do any SOC calcs
+    {
+        utils::CalcSOC();
+    }
 
     Param::SetInt(Param::cruisestt, selectedVehicle->GetCruiseState());
     Param::SetFloat(Param::FrontRearBal, selectedVehicle->GetFrontRearBalance());
@@ -283,8 +383,13 @@ static void Ms100Task(void)
     selectedBMS->Task100Ms();
     selectedDCDC->Task100Ms();
     selectedShifter->Task100Ms();
+    selectedHeater->Task100Ms();
     canMap->SendAll();
 
+    if(OutlanderCAN == true)
+    {
+        OutlanderHeartBeat::Task100Ms();
+    }
 
     if (Param::GetInt(Param::dir) < 0)
     {
@@ -315,7 +420,7 @@ static void Ms100Task(void)
     int32_t IsaTemp=ISA::Temperature;
     Param::SetInt(Param::tmpaux,IsaTemp);
 
-    if(targetChgint == ChargeInterfaces::i3LIM || chargeModeDC) selectedChargeInt->Task100Ms();// send the 100ms task request for the lim all the time and for others if in DC charge mode
+    if(targetChgint == ChargeInterfaces::i3LIM || targetChgint == ChargeInterfaces::Focci || chargeModeDC) selectedChargeInt->Task100Ms();// send the 100ms task request for the lim all the time and for others if in DC charge mode
 
     if(selectedChargeInt->DCFCRequest(RunChg))//Request to run dc fast charge
     {
@@ -335,7 +440,42 @@ static void Ms100Task(void)
         ACrequest=selectedChargeInt->ACRequest(RunChg);
     }
 
-    Param::SetInt(Param::HeatReq,IOMatrix::GetPin(IOMatrix::HEATREQ)->Get());
+    if (IOMatrix::GetPin(IOMatrix::HEATREQ) != &DigIo::dummypin)
+    {
+        Param::SetInt(Param::HeatReq,IOMatrix::GetPin(IOMatrix::HEATREQ)->Get());
+    }
+
+    DigiPot::SetPot1Step(); //just for dev
+    DigiPot::SetPot2Step(); //just for dev
+
+    //Cooling Fan Control//
+    if(opmode==MOD_CHARGE || opmode==MOD_RUN)
+    {
+        float tempTemp = MAX(Param::GetFloat(Param::tmphs),Param::GetFloat(Param::ChgTemp));
+
+        if(Param::GetFloat(Param::FanTemp) < tempTemp)
+        {
+            IOMatrix::GetPin(IOMatrix::COOLINGFAN)->Set();//Coolant Fan On
+        }
+        else if((Param::GetFloat(Param::FanTemp)-5) > tempTemp)
+        {
+            IOMatrix::GetPin(IOMatrix::COOLINGFAN)->Clear();//Coolant Fan Off
+        }
+    }
+    else
+    {
+        IOMatrix::GetPin(IOMatrix::COOLINGFAN)->Clear();//Coolant Fan Off
+    }
+
+    //HV Active output
+    if(opmode==MOD_CHARGE || opmode==MOD_RUN)
+    {
+        IOMatrix::GetPin(IOMatrix::HVACTIVE)->Set();//HV Active On
+    }
+    else
+    {
+        IOMatrix::GetPin(IOMatrix::HVACTIVE)->Clear();//HV Active Off
+    }
 }
 
 static void ControlCabHeater(int opmode)
@@ -371,7 +511,7 @@ static void Ms10Task(void)
 
     selectedChargeInt->Task10Ms();
 
-    if (Param::GetInt(Param::opmode) == MOD_RUN)
+    if (Param::GetInt(Param::opmode) == MOD_RUN) //!!!THROTTLE CODE HERE//
     {
         torquePercent = utils::ProcessThrottle(ABS(previousSpeed)); //run the throttle reading and checks and then generate Potnom
 
@@ -411,9 +551,10 @@ static void Ms10Task(void)
 
     selectedInverter->SetTorque(torquePercent);
 
-    //Brake light based on regen being below the set threshold
-    if(torquePercent < Param::GetFloat(Param::RegenBrakeLight))
+
+    if(Param::GetInt(Param::potnom) < Param::GetInt(Param::RegenBrakeLight))
     {
+        Param::SetInt(Param::BrkVacVal,torquePercent*requestedDirection*-1);
         //enable Brake Light Ouput
         IOMatrix::GetPin(IOMatrix::BRAKELIGHT)->Set();
     }
@@ -428,7 +569,10 @@ static void Ms10Task(void)
     Param::SetInt(Param::speed, speed);
     utils::GetDigInputs(canInterface[Param::GetInt(Param::InverterCan)]);
 
-    selectedVehicle->SetRevCounter(ABS(speed)); //ABS allowed here to keep number from rolling over.
+    if(opmode==MOD_RUN || opmode==MOD_CHARGE) //only set rev counter when in RUN or CHARGE
+    {
+        selectedVehicle->SetRevCounter(ABS(speed)); //ABS allowed here to keep number from rolling over.
+    }
     selectedVehicle->SetTemperatureGauge(Param::GetFloat(Param::tmphs));
     selectedVehicle->Task10Ms();
     selectedDCDC->Task10Ms();
@@ -451,19 +595,26 @@ static void Ms10Task(void)
         initbyStart=false;
         initbyCharge=false;
         DigIo::inv_out.Clear();//inverter power off
-        DigIo::dcsw_out.Clear();
-        IOMatrix::GetPin(IOMatrix::NEGCONTACTOR)->Clear();//Negative contactors off if used
         IOMatrix::GetPin(IOMatrix::COOLANTPUMP)->Clear();//Coolant pump off if used
-        DigIo::prec_out.Clear();
         Param::SetInt(Param::dir, 0); // shift to park/neutral on shutdown regardless of shifter pos
         selectedVehicle->DashOff();
         StartSig=false;//reset for next time
+
+        if(rlyDly!=0) rlyDly--;//here we are going to pause to allow system shut down before opening HV contactors
+        if(rlyDly==0)
+        {
+            DigIo::dcsw_out.Clear();
+            IOMatrix::GetPin(IOMatrix::NEGCONTACTOR)->Clear();//Negative contactors off if used
+            DigIo::prec_out.Clear();
+        }
+
         if(Param::GetInt(Param::pot) < Param::GetInt(Param::potmin))
         {
             if ((selectedVehicle->Start() && selectedVehicle->Ready()))
             {
                 StartSig=true;
                 opmode = MOD_PRECHARGE;//proceed to precharge if 1)throttle not pressed , 2)ign on , 3)start signal rx
+                rlyDly=25;//Recharge sequence timer
                 vehicleStartTime = rtc_get_counter_val();
                 initbyStart=true;
             }
@@ -471,17 +622,21 @@ static void Ms10Task(void)
         if(chargeMode)
         {
             opmode = MOD_PRECHARGE;//proceed to precharge if charge requested.
+            rlyDly=25;//Recharge sequence timer
             vehicleStartTime = rtc_get_counter_val();
             initbyCharge=true;
         }
         Param::SetInt(Param::opmode, opmode);
-        rlyDly=25;//Recharge sequence timer
         break;
 
     case MOD_PRECHARGE:
         if (!chargeMode)
         {
             if(selectedInverter != &openInv)DigIo::inv_out.Set();//inverter power on but not if we are in charge mode and not if OI
+        }
+        else if((Param::GetInt(Param::ShuntType) == 0) && selectedInverter == &leafInv)//Shunt 0 + Leaf is precharge using leaf inverter voltage
+        {
+            DigIo::inv_out.Set(); //inverter power on
         }
         IOMatrix::GetPin(IOMatrix::NEGCONTACTOR)->Set();
         IOMatrix::GetPin(IOMatrix::COOLANTPUMP)->Set();
@@ -494,11 +649,13 @@ static void Ms10Task(void)
                 opmode = MOD_RUN;
                 StartSig=false;//reset for next time
                 rlyDly=25;//Recharge sequence timer
+                Param::SetInt(Param::TorqDerate,0);//clear torque derate reason
             }
             else if(chargeMode)
             {
                 opmode = MOD_CHARGE;
                 rlyDly=25;//Recharge sequence timer
+                Param::SetInt(Param::TorqDerate,0);//clear torque derate reason
             }
 
         }
@@ -523,9 +680,16 @@ static void Ms10Task(void)
 
     case MOD_CHARGE:
         if(rlyDly!=0) rlyDly--;//here we are going to pause before energising precharge to prevent too many contactors pulling amps at the same time
-        if(rlyDly==0) DigIo::dcsw_out.Set();
+        if(rlyDly==0)
+        {
+            DigIo::dcsw_out.Set();
+        }
         ErrorMessage::UnpostAll();
-        if(!chargeMode) opmode = MOD_OFF;
+        if(!chargeMode)
+        {
+            opmode = MOD_OFF;
+            rlyDly=250;//Recharge sequence timer for delayed shutdown
+        }
         Param::SetInt(Param::opmode, opmode);
         break;
 
@@ -538,16 +702,18 @@ static void Ms10Task(void)
         }
         Param::SetInt(Param::opmode, MOD_RUN);
         ErrorMessage::UnpostAll();
-        if(!selectedVehicle->Ready()) opmode = MOD_OFF;
+        if(!selectedVehicle->Ready())
+        {
+            opmode = MOD_OFF;
+            rlyDly=250;//Recharge sequence timer for delayed shutdown
+        }
         Param::SetInt(Param::opmode, opmode);
         break;
-
-
     }
 
     ControlCabHeater(opmode);
-    if (Param::GetInt(Param::Type) == 1)  SBOX::ControlContactors(opmode,canInterface[Param::GetInt(Param::ShuntCan)]);//BMW contactor box
-    if (Param::GetInt(Param::Type) == 2)  VWBOX::ControlContactors(opmode,canInterface[Param::GetInt(Param::ShuntCan)]);//VW contactor box
+    if (Param::GetInt(Param::ShuntType) == 2)  SBOX::ControlContactors(opmode,canInterface[Param::GetInt(Param::ShuntCan)]);//BMW contactor box
+    if (Param::GetInt(Param::ShuntType) == 3)  VWBOX::ControlContactors(opmode,canInterface[Param::GetInt(Param::ShuntCan)]);//VW contactor box
 
 
 }
@@ -588,12 +754,14 @@ static void UpdateInv()
         break;
     case InvModes::Outlander:
         selectedInverter = &outlanderInv;
+        OutlanderCAN = true;
         break;
     case InvModes::OpenI:
         selectedInverter = &openInv;
         break;
     case InvModes::RearOutlander:
         selectedInverter = &rearoutlanderInv;
+        OutlanderCAN = true;
         break;
     }
     //This will call SetCanFilters() via the Clear Callback
@@ -628,6 +796,9 @@ static void UpdateVehicle()
     case vehicles::vBMW_E31:
         selectedVehicle = &e31Vehicle;
         break;
+    case vehicles::Classic:
+        selectedVehicle = &classVehicle;
+        break;
     }
     //This will call SetCanFilters() via the Clear Callback
     canInterface[0]->ClearUserMessages();
@@ -657,6 +828,7 @@ static void UpdateCharger()
         break;
     case ChargeModes::Out_lander:
         selectedCharger = &outChg;
+        OutlanderCAN = true;
         break;
     case ChargeModes::Elcon:
         selectedCharger = &ChargerElcon;
@@ -685,6 +857,9 @@ static void UpdateChargeInt()
     case ChargeInterfaces::CPC:
         selectedChargeInt = &CPCcan;
         break;
+    case ChargeInterfaces::Focci:
+        selectedChargeInt = &Foccican;
+        break;
     }
     //This will call SetCanFilters() via the Clear Callback
     canInterface[0]->ClearUserMessages();
@@ -705,6 +880,11 @@ static void UpdateHeater()
     case HeatType::VW:
         selectedHeater = &heaterVW;
         heaterVW.SetLinInterface(lin);
+        break;
+    case HeatType::OutlanderHeater:
+        selectedHeater = &outlanderCanHeater;
+        OutlanderCAN = true;
+        break;
     }
     //This will call SetCanFilters() via the Clear Callback
     canInterface[0]->ClearUserMessages();
@@ -719,14 +899,19 @@ static void UpdateBMS()
     case BMSModes::BMSModeSimpBMS:
         selectedBMS = &BMSsimp;
         break;
+    case BMSModes::BMSModeLeafBMS:
+        selectedBMS = &BMSleaf;
+        break;
     case BMSModes::BMSModeDaisychainSingleBMS:
     case BMSModes::BMSModeDaisychainDualBMS:
         selectedBMS = &BMSdaisychain;
         break;
+    case BMSModes::BMSRenaultKangoo33BMS:
+        selectedBMS = &BMSRenaultKangoo33;
+        break;
     case BMSModes::BMSModePSA50kWhBMS:
         selectedBMS = &BMSPSA50kWh;
         break;
-
     default:
         // Default to no BMS
         selectedBMS = &BMSnone;
@@ -739,7 +924,7 @@ static void UpdateBMS()
 
 static void UpdateDCDC()
 {
-    selectedBMS->DeInit();
+    selectedDCDC->DeInit();
     switch (Param::GetInt(Param::DCdc_Type))
     {
     case DCDCModes::NoDCDC:
@@ -782,6 +967,10 @@ static void UpdateShifter()
         selectedShifter = &JLRG2shift;
         break;
 
+    case ShifterModes::BMWE65:
+        selectedShifter = &E65GearLever;
+        break;
+
     default:
         // Default to no shifter
         selectedShifter = &shifterNone;
@@ -805,6 +994,7 @@ static void SetCanFilters()
     CanHardware* bms_can = canInterface[Param::GetInt(Param::BMSCan)];
     CanHardware* obd2_can = canInterface[Param::GetInt(Param::OBD2Can)];
     CanHardware* dcdc_can = canInterface[Param::GetInt(Param::DCDCCan)];
+    CanHardware* heater_can = canInterface[Param::GetInt(Param::HeaterCan)];
 
     selectedInverter->SetCanInterface(inverter_can);
     selectedVehicle->SetCanInterface(vehicle_can);
@@ -814,10 +1004,11 @@ static void SetCanFilters()
     selectedDCDC->SetCanInterface(dcdc_can);
     selectedShifter->SetCanInterface(vehicle_can);
     canOBD2.SetCanInterface(obd2_can);
+    selectedHeater->SetCanInterface(heater_can);
 
-    if (Param::GetInt(Param::Type) == 0)  ISA::RegisterCanMessages(shunt_can);//select isa shunt
-    if (Param::GetInt(Param::Type) == 1)  SBOX::RegisterCanMessages(shunt_can);//select bmw sbox
-    if (Param::GetInt(Param::Type) == 2)  VWBOX::RegisterCanMessages(shunt_can);//select vw sbox
+    if (Param::GetInt(Param::ShuntType) == 1)  ISA::RegisterCanMessages(shunt_can);//select isa shunt
+    if (Param::GetInt(Param::ShuntType) == 2)  SBOX::RegisterCanMessages(shunt_can);//select bmw sbox
+    if (Param::GetInt(Param::ShuntType) == 3)  VWBOX::RegisterCanMessages(shunt_can);//select vw sbox
 
     canInterface[1]->RegisterUserMessage(0x601); //CanSDO
     canInterface[0]->RegisterUserMessage(0x601); //CanSDO
@@ -875,6 +1066,9 @@ void Param::Change(Param::PARAM_NUM paramNum)
     case Param::PWM3Func:
         tim3_setup();
         break;
+    case Param::CP_PWM:
+        //timer_set_oc_value(TIM3, TIM_OC3, (Param::GetInt(Param::CP_PWM)*66)-16);//No duty set here
+        break;
     default:
         break;
     }
@@ -909,10 +1103,10 @@ void Param::Change(Param::PARAM_NUM paramNum)
     Throttle::throtmax = Param::GetFloat(Param::throtmax);
     Throttle::throtmin = Param::GetFloat(Param::throtmin);
     Throttle::throtdead = Param::GetFloat(Param::throtdead);
-    Throttle::idcmin = Param::GetFloat(Param::idcmin);
-    Throttle::idcmax = Param::GetFloat(Param::idcmax);
-    Throttle::udcmin = Param::GetFloat(Param::udcmin);
-    Throttle::udcmax = Param::GetFloat(Param::udclim);
+    //Throttle::idcmin = Param::GetFloat(Param::idcmin); //Make them dynamic so code section can impact
+    //Throttle::idcmax = Param::GetFloat(Param::idcmax);
+    //Throttle::udcmin = Param::GetFloat(Param::udcmin);
+    //Throttle::udcmax = Param::GetFloat(Param::udclim);
     Throttle::speedLimit = Param::GetInt(Param::revlim);
     Throttle::regenRamp = Param::GetFloat(Param::regenramp);
     Throttle::throttleRamp = Param::GetFloat(Param::throtramp);
@@ -948,9 +1142,9 @@ static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) //This is wh
         break;
 
     default:
-        if (Param::GetInt(Param::Type) == 0)  ISA::DecodeCAN(id, data);
-        if (Param::GetInt(Param::Type) == 1)  SBOX::DecodeCAN(id, data);
-        if (Param::GetInt(Param::Type) == 2)  VWBOX::DecodeCAN(id, data);
+        if (Param::GetInt(Param::ShuntType) == 1)  ISA::DecodeCAN(id, data);
+        if (Param::GetInt(Param::ShuntType) == 2)  SBOX::DecodeCAN(id, data);
+        if (Param::GetInt(Param::ShuntType) == 3)  VWBOX::DecodeCAN(id, data);
         selectedInverter->DecodeCAN(id, data);
         selectedVehicle->DecodeCAN(id, data);
         selectedCharger->DecodeCAN(id, data);
@@ -958,6 +1152,7 @@ static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) //This is wh
         selectedBMS->DecodeCAN(id, (uint8_t*)data);
         selectedDCDC->DecodeCAN(id, (uint8_t*)data);
         selectedShifter->DecodeCAN(id,data);
+        selectedHeater->DecodeCAN(id, data);
         break;
     }
     return false;
@@ -1090,6 +1285,7 @@ extern "C" int main(void)
     s.AddTask(Ms200Task, 200);
 
     if(Param::GetInt(Param::IsaInit)==1) ISA::initialize(shunt_can);//only call this once if a new sensor is fitted.
+
 
     Param::SetInt(Param::version, 4); //backward compatibility
     Param::SetInt(Param::opmode, MOD_OFF);//always off at startup

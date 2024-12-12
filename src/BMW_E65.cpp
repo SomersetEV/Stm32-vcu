@@ -1,7 +1,7 @@
 #include <BMW_E65.h>
 #include "stm32_can.h"
 #include "params.h"
-
+#include "utils.h"
 
 uint8_t  Gcount; //gear display counter byte
 uint8_t shiftPos=0xe1; //contains byte to display gear position on dash.default to park
@@ -15,15 +15,17 @@ uint8_t A90=0xe9;//0x0A9 first counter byte
 uint8_t A91=0x00;//0x0A9 second counter byte
 uint8_t BA5=0x4d;//0x0BA first counter byte(byte 5)
 uint8_t BA6=0x80;//0x0BA second counter byte(byte 6)
-
+uint8_t AA1=0x00;//0x0AA First counter byte
+uint8_t engineLights = 0;
 
 void BMW_E65::SetCanInterface(CanHardware* c)
 {
     can = c;
 
     can->RegisterUserMessage(0x130);//E65 CAS
-    can->RegisterUserMessage(0x192);//E65 Shifter
+    can->RegisterUserMessage(0x2FC);//E90 Enclosure status
     can->RegisterUserMessage(0x480);//Network Management
+    can->RegisterUserMessage(0x1A0);//Speed
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////Handle incomming pt can messages from the car here
@@ -37,8 +39,12 @@ void BMW_E65::DecodeCAN(int id, uint32_t* data)
         BMW_E65::handle130(data);
         break;
 
-    case 0x192:
-        BMW_E65::handle192(data);
+    case 0x1A0:
+        BMW_E65::handle1A0(data);
+        break;
+
+    case 0x2FC:
+        BMW_E65::handle2FC(data);
         break;
 
     case 0x480:
@@ -101,36 +107,24 @@ void BMW_E65::handle130(uint32_t data[2])
     }
 }
 
-void BMW_E65::handle192(uint32_t data[2])
+void BMW_E65::handle1A0(uint32_t data[2])
 {
-    uint32_t GLeaver = data[0] & 0x00ffffff;  //unsigned int to contain result of message 0x192. Gear selector lever position
+    uint8_t* bytes = (uint8_t*)data;
 
-    switch (GLeaver)
+    float kph = (bytes[0] + uint16_t((bytes[1]&0x0F)<<8)) * 0.1;
+    Param::SetFloat(Param::Veh_Speed, kph * 0.621371f);
+}
+
+void BMW_E65::handle2FC(uint32_t data[2])
+{
+    uint8_t* bytes = (uint8_t*)data;
+    if (bytes[0] == 0x84)//Locked
     {
-    case 0x80506a:  //park button pressed
-        this->gear = PARK;
-        gear_BA = 0x03;
-        shiftPos = 0xe1;
-        break;
-    case 0x80042d: //R+ position
-        this->gear = REVERSE;
-        gear_BA = 0x02;
-        shiftPos = 0xd2;
-        break;
-    case 0x800374:  //D+ pressed
-        this->gear = DRIVE;
-        gear_BA = 0x08;
-        shiftPos = 0x78;
-        break;
-    case 0x80006a:  //not pressed
-    case 0x800147:  //R position
-    case 0x800259:  //D pressed
-    case 0x81006a:  //Left Back button pressed
-    case 0x82006a:  //Left Front button pressed
-    case 0x84006a:  //right Back button pressed
-    case 0x88006a:  //right Front button pressed
-    case 0xa0006a:  //  S-M-D button pressed
-        break;
+        Param::SetInt(Param::VehLockSt,1);
+    }
+    else if (bytes[0] == 0x81)//Unlocked
+    {
+        Param::SetInt(Param::VehLockSt,0);
     }
 }
 
@@ -152,16 +146,6 @@ void BMW_E65::Task10Ms()
 {
     if(CANWake)
     {
-        if (Ready())
-        {
-            uint32_t data[2];
-            int rpm = MAX(750, revCounter) * 4; // rpm value for E65
-
-            data[0] = 0xff595f;
-            data[1] = 0x99800000 | rpm;
-            can->Send(0x0AA, data); //Send on CAN2
-        }
-
         SendAbsDscMessages(Param::GetBool(Param::din_brake));
     }
 }
@@ -190,39 +174,34 @@ void BMW_E65::Task100Ms()
 
 void BMW_E65::Task200Ms()
 {
+    uint8_t bytes[8];
+
     if(CANWake)
     {
+        //update shitPos over CAN
+        int selectedDir = Param::GetInt(Param::dir);
 
-        if (isE90)
+        if (selectedDir == 0)
         {
-            //update shitPos
-            int selectedDir = Param::GetInt(Param::dir);
-
-            if (selectedDir == 0)
-            {
-                //neutral/park
-                this->gear = PARK;
-                gear_BA = 0x03;
-                shiftPos = 0xe1;
-            }
-            else if (selectedDir == -1)
-            {
-                //reverse
-                this->gear = REVERSE;
-                gear_BA = 0x02;
-                shiftPos = 0xd2;
-            }
-            else if (selectedDir == 1)
-            {
-                //forward
-                this->gear = DRIVE;
-                gear_BA = 0x08;
-                shiftPos = 0x78;
-            }
-
+            //neutral/park
+            this->gear = PARK;
+            gear_BA = 0x03;
+            shiftPos = 0xe1;
         }
-
-        uint8_t bytes[8];
+        else if (selectedDir == -1)
+        {
+            //reverse
+            this->gear = REVERSE;
+            gear_BA = 0x02;
+            shiftPos = 0xd2;
+        }
+        else if (selectedDir == 1)
+        {
+            //forward
+            this->gear = DRIVE;
+            gear_BA = 0x08;
+            shiftPos = 0x78;
+        }
 ///////////////////////////////////////////////////////////////////////////////////////////////////
         bytes[0]=shiftPos;  //e1=P  78=D  d2=R  b4=N
         bytes[1]=0x0c;
@@ -241,6 +220,33 @@ void BMW_E65::Task200Ms()
         {
             Gcount=0x0D;
         }
+
+        //ERROR lights over CAN////////
+        uint8_t errorLightsParam = Param::GetInt(Param::errlights);
+        if (engineLights != errorLightsParam)
+        {
+            bytes[0]=0x40;
+            bytes[1]=0x22;
+            bytes[2]=0x00;
+            bytes[4]=0xFF;
+            bytes[5]=0xFF;
+            bytes[6]=0xFF;
+            bytes[7]=0xFF;
+
+            if (errorLightsParam == 0)
+            {
+                bytes[3]=0x30;
+            }
+            else if (errorLightsParam == 8)
+            {
+                bytes[3]=0x31;
+            }
+            engineLights = errorLightsParam;
+
+            can->Send(0x592,bytes,8); //Send on CAN2
+        }
+
+        SetFuelGauge(Param::GetFloat(Param::SOC));
     }
 }
 
@@ -253,8 +259,40 @@ void BMW_E65::SendAbsDscMessages(bool Brake_In)
 {
 
 //////////send abs/dsc messages////////////////////////
-    uint8_t a8_brake;
     uint8_t bytes[8];
+
+    uint16_t RPM_A = 0;
+    if (Ready())
+    {
+        RPM_A = MAX(750, Param::GetInt(Param::speed)) * 4;
+        bytes[1] = 0x50 | AA1;  //Counter for 0xAA Byte 0
+        bytes[2] = 0x07;
+        bytes[6] = 0x94;
+        bytes[7] = 0x00;
+    }
+    else
+    {
+        bytes[1] = 0x30 | AA1;  //Counter for 0xAA Byte 0
+        bytes[2] = 0xFE;
+        bytes[6] = 0x84;
+        bytes[7] = 0x00;
+    }
+    bytes[3] = 0x00;             //Pedal position 0-255
+    bytes[4] = RPM_A & 0xff;   //lowByte(RPM_A);
+    bytes[5] = RPM_A>>8 & 0xff;;  //highByte(RPM_A);
+
+
+    ///Check sum math for 0x0AA///
+    int16_t check_AA = (bytes[1] + bytes[2] + bytes[3] + bytes[4] + bytes[5] + bytes[6] + bytes[7] + 0xAA);
+    check_AA = (check_AA / 0x100) + (check_AA & 0xff);
+    check_AA = check_AA & 0xff;
+    bytes[0] = check_AA;  //checksum
+
+    can->Send(0x0AA, bytes, 8); //Send on CAN
+
+
+    uint8_t a8_brake;
+
 
     if(Brake_In)
     {
@@ -279,7 +317,7 @@ void BMW_E65::SendAbsDscMessages(bool Brake_In)
     bytes[6]=0x0f;
     bytes[7]=a8_brake;  //brake off =0x04 , brake on = 0x64.
 
-    can->Send(0x0A8, bytes, 8); //Send on CAN2
+    can->Send(0x0A8, bytes, 8); //Send on CAN
 
     bytes[0]=A90; //first counter byte
     bytes[1]=A91; //second counter byte
@@ -290,7 +328,7 @@ void BMW_E65::SendAbsDscMessages(bool Brake_In)
     bytes[6]=0xe0;
     bytes[7]=0x21;
 
-    can->Send(0x0A9, bytes, 8); //Send on CAN2
+    can->Send(0x0A9, bytes, 8); //Send on CAN
 
     int16_t check_BA = (gear_BA+0xff+0x0f+BA6+0x0ba);
     check_BA = (check_BA / 0x100)+ (check_BA & 0xff);
@@ -309,6 +347,7 @@ void BMW_E65::SendAbsDscMessages(bool Brake_In)
 ////////////////////////////////////////
 ////here we increment the abs/dsc msg counters
 
+    AA1++;
     A80++;
     A81++;
     A90++;
@@ -318,6 +357,7 @@ void BMW_E65::SendAbsDscMessages(bool Brake_In)
 
     if (BA5==0x5C) //reload initial condition
     {
+        AA1 = 0x0;  //0x0AA second counter byte
         A80=0xbe;//0x0A8 first counter byte
         A81=0x00;//0x0A8 second counter byte
         A90=0xe9;//0x0A9 first counter byte
@@ -337,8 +377,9 @@ void BMW_E65::Engine_Data()
     if (Param::GetInt(Param::opmode) == MOD_RUN)
     {
         EngRun = 0x60;
-        bytes[4] = 0x9C;
-        bytes[5] = 0x9E;
+        uint16_t injectors = 40604;
+        bytes[4] = injectors;
+        bytes[5] = injectors >> 8;
     }
     else
     {
@@ -346,20 +387,29 @@ void BMW_E65::Engine_Data()
         bytes[5] = 0x00;
     }
 
+    float Curr = Param::GetFloat(Param::idc) * -1;
+    Curr = Curr + 100;
+    float Temp = utils::change(Curr, 0, 500, 50, 150);
+    Temp = Temp + 48;
+    if (Curr > 525)
+    {
+        Temp = 150;
+    }
+
     bytes[0] = 0x3C;            //Engine Coolant Temp
-    bytes[1] = 0xFF;            //Engine Oil Temp
+    bytes[1] = Temp;            //Engine Oil Temp, use to show current
     bytes[2] = EngRun | C1D00;  //Counter
     bytes[3] = 0xC3;
 
     bytes[6] = 0xCD;
     bytes[7] = 0x82;  //Idle Traget
 
-    can->Send(0x1D0,bytes,8); //Send on CAN2
+    can->Send(0x1D0,bytes,8); //Send on CAN
 
     if (C1D00 == C1D01)
-{
-    C1D00++;
-    if (C1D00 == 0x0F)
+    {
+        C1D00++;
+        if (C1D00 == 0x0F)
         {
             C1D00 = 0x00;
         }
@@ -371,12 +421,43 @@ void BMW_E65::Engine_Data()
 
 }
 
-bool BMW_E65::GetGear(Vehicle::gear& outGear)
+void BMW_E65::SetFuelGauge(float level)
 {
-    if (isE90)
+    int pot1 = 0;
+    int pot2 = 0;
+    const int fuelGaugeMap[20][3] =
     {
-        return false;
+        { 5, 1, 0 },
+        { 10, 1, 1 },
+        { 15, 2, 1 },
+        { 20, 2, 2 },
+        { 25, 3, 2 },
+        { 30, 4, 3 },
+        { 35, 4, 4 },
+        { 40, 5, 4 },
+        { 45, 5, 5 },
+        { 50, 6, 6 },
+        { 55, 7, 6 },
+        { 60, 8, 7 },
+        { 65, 8, 8 },
+        { 70, 9, 9 },
+        { 75, 10, 10 },
+        { 80, 11, 11 },
+        { 85, 12, 12 },
+        { 90, 14, 14 },
+        { 95, 17, 16 },
+        { 100, 19, 19 }
+    };
+
+    for(int i = 0; i < 20; i++)
+    {
+        if (level >= fuelGaugeMap[i][0])
+        {
+            pot1 = fuelGaugeMap[i][1];
+            pot2 = fuelGaugeMap[i][2];
+        }
     }
-    outGear = gear;    //send the shifter pos
-    return true; //Let caller know we set a valid gear
+
+    Param::SetInt(Param::DigiPot1Step, pot1);
+    Param::SetInt(Param::DigiPot2Step, pot2);
 }

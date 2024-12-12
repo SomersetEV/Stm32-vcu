@@ -43,8 +43,8 @@ OBJSL		= $(BINARY).o hwinit.o stm32scheduler.o params.o terminal.o terminal_prj.
            param_save.o errormessage.o stm32_can.o leafinv.o utils.o terminalcommands.o i3LIM.o \
            chademo.o amperaheater.o amperacharger.o subaruvehicle.o iomatrix.o bmw_sbox.o NissanPDM.o teslaCharger.o extCharger.o vag_sbox.o \
            daisychainbms.o simpbms.o outlanderCharger.o Can_OBD2.o cansdo.o TeslaDCDC.o BMW_E31.o F30_Lever.o \
-           CPC.o ElconCharger.o RearOutlanderinverter.o linbus.o VWheater.o JLR_G1.o JLR_G2.o PSA50kWhBMS.o
-		   
+           CPC.o ElconCharger.o RearOutlanderinverter.o linbus.o VWheater.o JLR_G1.o JLR_G2.o Focci.o digipot.o\
+		   OutlanderHeartBeat.o E65_Lever.o leafbms.o V_Classic.o kangoobms.o OutlanderCanHeater.o PSA50kWhBMS.o
            
 OBJS     = $(patsubst %.o,$(OUT_DIR)/%.o, $(OBJSL))
 vpath %.c src/ libopeninv/src/
@@ -61,6 +61,24 @@ ifneq ($(V),1)
 Q := @
 NULL := 2>/dev/null
 endif
+
+# try-run
+# Usage: option = $(call try-run, command,option-ok,otherwise)
+# Exit code chooses option.
+try-run = $(shell set -e;		\
+	if ($(1)) >/dev/null 2>&1;	\
+	then echo "$(2)";		\
+	else echo "$(3)";		\
+	fi)
+
+# Test a linker (ld) option and return the gcc link command equivalent
+comma := ,
+link_command := -Wl$(comma)
+ld-option = $(call try-run, $(PREFIX)-ld $(1) -v,$(link_command)$(1))
+
+# Test whether we can suppress a safe warning about rwx segments
+# only supported on binutils 2.39 or later
+LDFLAGS	+= $(call ld-option,--no-warn-rwx-segments)
 
 all: directories images
 Debug:images
@@ -125,7 +143,7 @@ ifneq ($(shell test -s libopencm3/lib/libopencm3_stm32f1.a && echo -n yes),yes)
 	@printf "  GIT SUBMODULE\n"
 	$(Q)git submodule update --init
 	@printf "  MAKE libopencm3\n"
-	$(Q)${MAKE} -C libopencm3
+	$(Q)${MAKE} -C libopencm3 TARGETS=stm32/f1
 endif
 
 Test:
