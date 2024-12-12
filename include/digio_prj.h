@@ -43,9 +43,9 @@
     DIG_IO_ENTRY(SL1_out,   GPIOC, GPIO9,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(SL2_out,   GPIOC, GPIO8,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(SP_out,    GPIOD, GPIO12, PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(gear1_in,  GPIOE, GPIO3,  PinMode::INPUT_FLT_INV)   \
-    DIG_IO_ENTRY(gear2_in,  GPIOE, GPIO4,  PinMode::INPUT_FLT_INV)   \
-    DIG_IO_ENTRY(gear3_in,  GPIOE, GPIO5,  PinMode::INPUT_FLT_INV)   \
+    DIG_IO_ENTRY(gear1_in,  GPIOE, GPIO3,  PinMode::INPUT_FLT)   \
+    DIG_IO_ENTRY(gear2_in,  GPIOE, GPIO4,  PinMode::INPUT_FLT)   \
+    DIG_IO_ENTRY(gear3_in,  GPIOE, GPIO5,  PinMode::INPUT_FLT)   \
     DIG_IO_ENTRY(req_out,   GPIOE, GPIO6,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(pot1_cs,   GPIOD, GPIO3,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(pot2_cs,   GPIOD, GPIO2,  PinMode::OUTPUT)      \

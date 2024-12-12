@@ -20,12 +20,13 @@
 #ifndef PSA50kWhBMS_H
 #define PSA50kWhBMS_H
 #include <stdint.h>
+#include "bms.h"
 
 class PSA50kWhBMS: public BMS
 {
    public:
-      virtual void SetCanInterface(CanHardware* c);
-      void DecodeCAN(int id, uint8_t * data);
+      void SetCanInterface(CanHardware* can) override;
+      void DecodeCAN(int id, uint8_t * data) override;
       float MaxChargeCurrent();
       void Task100Ms();
       void findlowestcellvoltage();
@@ -38,6 +39,9 @@ class PSA50kWhBMS: public BMS
       int chargeCurrentLimit = 0;
       int timeoutCounter = 0;
       float current = 0;
+      float batterycurrent;
+      float batteryvoltage;
+      float udcvoltage;
       float SoCValue;
       int Cell1v, Cell2v, Cell3v, Cell4v, Cell5v, Cell6v, Cell7v, Cell8v, Cell9v, Cell10v;
       int Cell11v, Cell12v, Cell13v, Cell14v, Cell15v, Cell16v, Cell17v, Cell18v, Cell19v, Cell20v;

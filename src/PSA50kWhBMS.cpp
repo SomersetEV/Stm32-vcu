@@ -16,8 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#include "stm32_vcu.h"
+#include "PSA50kWhBMS.h"
 /*
  * This module receives messages from PSA50kWhBMS and updates the
  * BMS_MinV, BMS_MaxV, BMS_MinT and BMS_MaxT parameters with the
@@ -27,9 +26,9 @@
  * working correctly.
  */
 
-void PSA50kWhBMS::SetCanInterface(CanHardware* c)
+void PSA50kWhBMS::SetCanInterface(CanHardware* can)
 {
-   can = c;
+  // can = c;
   can->RegisterUserMessage(0x6E0, 0x700);
   //can->RegisterUserMessage(0x6E0, 0x6E7);
   can->RegisterUserMessage(0x6D1, 0x6D5); 
@@ -473,14 +472,17 @@ Cell54t = data[7];
    break;
 
    case 0x125:
-  SoCValue = (data[0] << 8) | data[1];
+  SoCValue = data[0] * 0.4;
   Param::SetFloat(Param::SOC,SoCValue);
   //battery_voltage = (rx_frame.data.u8[3] << 8) | rx_frame.data.u8[4];
-  Current = (data[5] - 0x58) << 8 | data[2];
-  Current = (Current/256) * 10;
-   if (Param::GetIntParam::ShuntType) == 0//Only populate if no shunt is used
+  current = (data[5] - 0x58) << 8 | data[2];
+  batteryvoltage = (data[3] << 8) | data[4];
+  udcvoltage = (batteryvoltage / 128) * 10;
+  batterycurrent = (current/256) / 10;
+  if (Param::GetInt(Param::ShuntType) == 0)//Only populate if no shunt is used
    {
-  Param::SetFloat(Param::idc,Current);
+  Param::SetFloat(Param::idc,current);
+  Param::SetFloat(Param::udc2, udcvoltage);
    }
    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
 
