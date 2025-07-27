@@ -63,17 +63,15 @@ void OutlanderHeartBeat::Task100Ms()
         if (EnableEVSE)
         {
             bytes[2] = 0xB6;//oxb6 in byte 3 enables charger
+            can1->Send(0x285, (uint32_t*)bytes, 8);
         }
     }
     else if (MOD_RUN == opmode)
     {
 
-        bytes[2] = 0x14;
-        bytes[3] = 0x39;
-        bytes[4] = 0x8F;
-        bytes[5] = 0xFE;
-        bytes[6] = 0xC;
-        bytes[7] = 0x10;
+       data[0] = 0x39100000;
+       data[1] = 0x100CFE8F;
+       can1->Send(0x285, (uint32_t*)data, 8);
     }
 
     if (MOD_CHARGE == opmode || MOD_RUN == opmode)
