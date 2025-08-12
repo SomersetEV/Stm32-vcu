@@ -409,7 +409,8 @@ static void Ms100Task(void)
     Param::SetFloat(Param::FrontRearBal, selectedVehicle->GetFrontRearBalance());
 
     utils::ProcessCruiseControlButtons();
-
+    utils::Roadspeedcalc();
+    
     selectedInverter->Task100Ms();
     selectedVehicle->Task100Ms();
     selectedCharger->Task100Ms();
@@ -418,6 +419,7 @@ static void Ms100Task(void)
     selectedShifter->Task100Ms();
     selectedHeater->Task100Ms();
     canMap->SendAll();
+    
 
     if(OutlanderCAN == true)
     {

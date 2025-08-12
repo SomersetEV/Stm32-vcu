@@ -774,6 +774,33 @@ void SpeedoSet(uint16_t speed)
     }
 }
 
+void Roadspeedcalc()
+{
+    if(Param::GetInt(Param::Inverter) == 2) // do extra calculation based on current gear
+    {
+      if (Param::GetInt(Param::GearFB) == 0) //Low gear
+        {
+      float wheel_radius = (Param::GetInt(Param::Wheeldiameter)) / 2.0f;
+      float speed_kph = (3.6f * Param::GetInt(Param::speed) * 3.141592653589793 * wheel_radius) / (Param::GetInt(Param::Drivetrainratio) * 3.9 * 30.0f);
+      Param::SetFloat(Param::RoadspeedKPH,speed_kph);
+      Param::SetFloat(Param::RoadspeedMPH,(speed_kph * 0.62137));
+       }
+      else //high gear
+      {
+      float wheel_radius = (Param::GetInt(Param::Wheeldiameter)) / 2.0f;
+      float speed_kph = (3.6f * Param::GetInt(Param::speed) * 3.141592653589793 * wheel_radius) / (Param::GetInt(Param::Drivetrainratio) * 1.9 * 30.0f);
+      Param::SetFloat(Param::RoadspeedKPH,speed_kph);
+      }
+    }
+    else // all other motors, so no extra reduction
+    {
+      float wheel_radius = (Param::GetInt(Param::Wheeldiameter)) / 2.0f;
+      float speed_kph = (3.6f * Param::GetInt(Param::speed) * 3.141592653589793 * wheel_radius) / (Param::GetInt(Param::Drivetrainratio) * 30.0f);
+      Param::SetFloat(Param::RoadspeedKPH,speed_kph);
+      Param::SetFloat(Param::RoadspeedMPH,(speed_kph * 0.62137));
+    }
+}
+
 void GS450hOilPump(uint16_t pumpdc)
 {
     if(Param::GetInt(Param::PumpPWM) == 0)//If Pump PWM out is set to Oil Pump

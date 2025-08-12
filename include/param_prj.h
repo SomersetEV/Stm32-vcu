@@ -27,7 +27,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 153
+//Next param id (increase when adding new parameter!): 157
 /*              category     name         unit       min     max     default id */
 #define PARAM_LIST \
     PARAM_ENTRY(CAT_SETUP,     Inverter,     INVMODES, 0,      8,      0,      5  ) \
@@ -161,6 +161,8 @@
     PARAM_ENTRY(CAT_PWM,       DC_MinTemp,   "",       1,      100,       0,   144 ) \
     PARAM_ENTRY(CAT_PWM,       DC_MaxSOC,   "",        1,      100,      10,   145 ) \
     PARAM_ENTRY(CAT_PWM,       DC_MinSOC,   "",        1,      100,       0,   146 ) \
+    PARAM_ENTRY(CAT_ROADSPEED, Wheeldiameter,   "cm",    1,      300,       1,   155 ) \
+    PARAM_ENTRY(CAT_ROADSPEED, Drivetrainratio,   "",    0,      300,       1,   156 ) \
     VALUE_ENTRY(version,       VERSTR,              2000 ) \
     VALUE_ENTRY(opmode,        OPMODES,             2002 ) \
     VALUE_ENTRY(chgtyp,        CHGTYPS,             2003 ) \
@@ -259,8 +261,10 @@
     VALUE_ENTRY(VehLockSt,     ONOFF,               2100 ) \
     VALUE_ENTRY(compressStat,  COMP_STAT,           2111 ) \
     VALUE_ENTRY(compressRPM,   "",                  2109 ) \
+    VALUE_ENTRY(RoadspeedMPH,   "",                 2112 ) \
+    VALUE_ENTRY(RoadspeedKPH,   "",                 2113 ) \
     
-//Next value Id: 2112
+//Next value Id: 2114
 
 //Dead params
 /*
@@ -328,6 +332,7 @@
 #define CAT_SHUNT    "ISA Shunt Control"
 #define CAT_IOPINS   "General Purpose I/O"
 #define CAT_PWM      "PWM Control"
+#define CAT_ROADSPEED "Road speed calculations"
 #define MotorsAct    "0=Mg1and2, 1=Mg1, 2=Mg2, 3=BlendingMG2and1"
 #define PumpOutType  "0=GS450hOil, 1=TachoOut, 2=SpeedoOut"
 #define LIMITREASON  "0=None, 1=UDClimLow, 2=UDClimHigh, 4=IDClimLow, 8=IDClimHigh, 16=TempLim"
