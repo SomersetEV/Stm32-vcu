@@ -533,11 +533,12 @@ void displayThrottle() {
 void CalcSOC() {
   float Capacity_Parm = Param::GetFloat(Param::BattCap);
   float kwh_Used = ABS(Param::GetFloat(Param::KWh));
-
-  SOCVal = 100.0f - 100.0f * kwh_Used / Capacity_Parm;
-
+  float InitialSOC = Param::GetFloat(Param::SOC_Init); // New: initial SOC % parameter
+  SOCVal = InitialSOC - 100.0f * kwh_Used / Capacity_Parm;
   if (SOCVal > 100)
     SOCVal = 100;
+  if (SOCVal < 0)
+    SOCVal = 0;
   Param::SetFloat(Param::SOC, SOCVal);
 }
 

@@ -26,7 +26,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-// Next param id (increase when adding new parameter!): 153
+// Next param id (increase when adding new parameter!): 155
 /*              category     name         unit       min     max     default id
  */
 #define PARAM_LIST                                                             \
@@ -178,6 +178,7 @@
   VALUE_ENTRY(KWh, "kwh", 2013)                                                \
   VALUE_ENTRY(AMPh, "Ah", 2014)                                                \
   VALUE_ENTRY(SOC, "%", 2015)                                                  \
+  VALUE_ENTRY(SOC_Init, "%", 2112)                                                  \
   VALUE_ENTRY(BMS_Vmin, "V", 2084)                                             \
   VALUE_ENTRY(BMS_Vmax, "V", 2085)                                             \
   VALUE_ENTRY(BMS_Tavg, "°C", 2103)                                            \
@@ -260,7 +261,7 @@
   VALUE_ENTRY(compressStat, COMP_STAT, 2111)                                   \
   VALUE_ENTRY(compressRPM, "", 2109)
 
-// Next value Id: 2112
+// Next value Id: 2113
 
 // Dead params
 /*

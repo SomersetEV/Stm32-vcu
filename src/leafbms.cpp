@@ -27,6 +27,7 @@
 #define ZE1_BATTERY 2  // 2018+ ZE1
 static uint8_t LEAF_battery_Type = ZE0_BATTERY;
 static int temperature = 0;
+static int initalSOC = 0;
 
 void LeafBMS::SetCanInterface(CanHardware *can) {
   can->RegisterUserMessage(0x1DB); // Leaf BMS message 10ms
@@ -106,7 +107,14 @@ void LeafBMS::DecodeCAN(int id, uint8_t *data) {
         0) // Only populate if no shunt is used
     {
       soc = soc * 0.1;
-      Param::SetFloat(Param::SOC, soc);
+      if (initalSOC == 0)
+      {
+      if (soc > 0)
+      {
+      Param::SetFloat(Param::SOC_Init, soc);
+      initalSOC = 1;
+      }
+    }
     }
 
     uint16_t IsoTemp = uint16_t(bytes[4] << 2) + uint16_t(bytes[5] >> 6);
