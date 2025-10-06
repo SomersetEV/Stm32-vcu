@@ -129,6 +129,7 @@ static bool chargeModeDC = false;
 static bool ChgLck = false;
 static CanHardware *canInterface[3];
 static CanMap *canMap;
+static CanSdo *canSdo;
 static ChargeModes targetCharger;
 static ChargeInterfaces targetChgint;
 static uint8_t ChgSet; // Temp variable storing Param::Chgctrl. 0=enable,
@@ -405,6 +406,7 @@ static void Ms100Task(void) {
   selectedShifter->Task100Ms();
   selectedHeater->Task100Ms();
   canMap->SendAll();
+  canSdo->TriggerTimeout(100);
 
   if (OutlanderCAN == true) {
     OutlanderHeartBeat::Task100Ms();
@@ -1436,6 +1438,7 @@ int main(void) {
   TerminalCommands::SetCanMap(&cm);
   SdoCommands::SetCanMap(&cm);
   canMap = &cm;
+  canSdo = &sdo;
 
   CanHardware *shunt_can = canInterface[Param::GetInt(Param::ShuntCan)];
 
