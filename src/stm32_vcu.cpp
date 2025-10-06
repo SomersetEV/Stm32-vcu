@@ -245,6 +245,7 @@ static void Ms200Task(void) {
   Param::SetInt(Param::Hour, hours);
   Param::SetInt(Param::Min, minutes);
   Param::SetInt(Param::Sec, seconds);
+  Param::SetInt(Param::uptime, rtc_get_counter_val());
   Param::SetInt(Param::ChgT, ChgDur_tmp);
 
   // Setting of RunChg - main okay to charge param
