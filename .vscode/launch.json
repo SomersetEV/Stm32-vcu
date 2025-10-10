@@ -6,36 +6,26 @@
     "configurations": [
         {
             "name": "Debug VCU",
-            "type": "cppdbg",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/stm32_vcu",
             "request": "launch",
-            "miDebuggerPath": "arm-none-eabi-gdb",
-            "targetArchitecture": "arm",
-            "program": "${workspaceFolder}/stm32_vcu",
-            "setupCommands": [
-                {
-                    "text": "set target-async off"
-                },
-                {
-                    "text": "file ${workspaceFolder}/stm32_vcu"
-                },
-                {
-                    "text": "set remote hardware-breakpoint-limit 6"
-                },
-                {
-                    "text": "set remote hardware-watchpoint-limit 4"
-                },
-                {
-                    "text": "target extended-remote localhost:3333"
-                },
-                {
-                    "text": "monitor arm semihosting enable"
-                },
-                {
-                    "text": "load ${workspaceFolder}/stm32_vcu"
-                }
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "interface": "swd",
+            "device": "STM32F107VC",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f1x.cfg"
             ],
-            "externalConsole": false,
-            "cwd": "${workspaceFolder}"
+            "runToEntryPoint": "main",
+            "preRestartCommands": [
+                "load",
+                "set remote hardware-breakpoint-limit 6",
+                "set remote hardware-watchpoint-limit 4",
+                "enable breakpoint",
+                "monitor reset",
+                "monitor arm semihosting enable",
+            ]
         },
         {
             "name": "test_vcu debug with gdb",
@@ -53,6 +43,6 @@
                     "text": "set output-radix 16"
                 }
             ]
-        }
+        },
     ]
 }

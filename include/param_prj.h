@@ -260,9 +260,10 @@
   VALUE_ENTRY(VehLockSt, ONOFF, 2100)                                          \
   VALUE_ENTRY(compressStat, COMP_STAT, 2111)                                   \
   VALUE_ENTRY(compressRPM, "", 2109)                                           \
-  VALUE_ENTRY(PWMHeatOn, ONOFF, 2112)
+  VALUE_ENTRY(PWMHeatOn, ONOFF, 2112)                                          \
+  VALUE_ENTRY(uptime, "sec", 2113)
 
-// Next value Id: 2113
+// Next value Id: 2114
 
 // Dead params
 /*
