@@ -261,7 +261,7 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
     }
   if(Param::GetInt(Param::PlugDet) == 1) // If charge socket is not empty. Force Neutral
   {
-    selectedDir = 0;
+    userDirSelection = 0;
   }
 
   }
