@@ -737,12 +737,11 @@ static void Ms10Task(void) {
 
     if (Param::GetInt(Param::pot) < Param::GetInt(Param::potmin)) { 
       if (selectedVehicle->Start() && selectedVehicle->Ready() &&
-          (HVILok > 0) &&  Param::GetInt(Param::PlugDet) == 0) { 
+          (HVILok > 0)) { 
         StartSig = true;
         opmode = MOD_PRECHARGE; // proceed to precharge if 1)throttle not
                                 // pressed , 2)ign on , 3)start signal rx, 4) HV
-                                // IL input is grounded if selected,
-                                // 5) the charge port is unplugged.
+                                // IL input is grounded if selected.
         rlyDly = 25;            // Recharge sequence timer
         vehicleStartTime = rtc_get_counter_val();
         initbyStart = true;
