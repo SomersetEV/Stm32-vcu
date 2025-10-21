@@ -259,12 +259,12 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
       else if (Param::GetBool(Param::din_reverse))
         userDirSelection = -1 * dirSign;
     }
-  if(Param::GetInt(Param::PlugDet) == 1) // If charge socket is not empty. Force Neutral
-  {
-    userDirSelection = 0;
-  }
-
-  }
+   if (Param::GetInt(Param::PlugDet) ==
++        1) // If charge socket is not empty. Force Neutral
++    {
++      userDirSelection = 0;
++    }
+   }
 
   // Change Allowed Logic//
 
