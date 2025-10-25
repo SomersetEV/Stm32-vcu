@@ -782,8 +782,10 @@ static void Ms10Task(void) {
       DigIo::prec_out.Set(); // commence precharge
     if (prechargeMinTime != 0)
       prechargeMinTime--; // 1 second minimum precharge time
-    if ((prechargeMinTime == 0)
-             && (stt & (STAT_POTPRESSED | STAT_UDCBELOWUDCSW | STAT_UDCLIM)) == 0)// Clarify operator precedence, exit precharge: time met and no faults
+    if ((prechargeMinTime == 0) &&
+        (stt & (STAT_POTPRESSED | STAT_UDCBELOWUDCSW | STAT_UDCLIM)) ==
+            0) // Clarify operator precedence, exit precharge: time met and no
+               // faults
     {
       if (StartSig) {
         opmode = MOD_RUN;
