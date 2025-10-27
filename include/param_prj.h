@@ -26,7 +26,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-// Next param id (increase when adding new parameter!): 156
+// Next param id (increase when adding new parameter!): 157
 /*              category     name         unit       min     max     default id
  */
 #define PARAM_LIST                                                             \
@@ -52,6 +52,7 @@
   PARAM_ENTRY(CAT_SETUP, MotActive, MotorsAct, 0, 3, 0, 129)                   \
   PARAM_ENTRY(CAT_SETUP, ConfigCANOI, ONOFF, 0, 1, 0, 149)                     \
   PARAM_ENTRY(CAT_SETUP, UseRS232, ONOFF, 0, 1, 0, 155)                        \
+  PARAM_ENTRY(CAT_SETUP, DriveInhibit, DRIVEINHIBITMODES, 0, 1, 0, 156)        \
   PARAM_ENTRY(CAT_THROTTLE, potmin, "dig", 0, 4095, 0, 7)                      \
   PARAM_ENTRY(CAT_THROTTLE, potmax, "dig", 0, 4095, 4095, 8)                   \
   PARAM_ENTRY(CAT_THROTTLE, pot2min, "dig", 0, 4095, 4095, 9)                  \
@@ -365,6 +366,7 @@
   "0=None, 1=UDClimLow, 2=UDClimHigh, 4=IDClimLow, 8=IDClimHigh, 16=TempLim"
 #define DIRLIM "0=None, 1=SpeedThres, 2=SpeedBrake"
 #define ABOVEBELOW "0=BelowOF,1=BelowScale, 2=AboveOF, 3=AboveScale"
+#define DRIVEINHIBITMODES "0=Off,1=Plug detect"
 
 #define CAN_PERIOD_100MS 0
 #define CAN_PERIOD_10MS 1

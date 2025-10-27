@@ -259,8 +259,16 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
       else if (Param::GetBool(Param::din_reverse))
         userDirSelection = -1 * dirSign;
     }
+    if (Param::GetInt(Param::DriveInhibit) ==
+        1) // drive inhibit selected, check for plug
+    {
+      if (Param::GetInt(Param::PlugDet) ==
+          1) // If charge socket is not empty. Force Neutral
+      {
+        userDirSelection = 0;
+      }
+    }
   }
-
   // Change Allowed Logic//
 
   if (selectedDir != userDirSelection) // only run if requested change
@@ -269,8 +277,8 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
     {
       selectedDir = userDirSelection; // direct pass through
     } else if (ChangeLim == 1 ||
-               2) // speed limit only when changing F to R or R to F, note last
-                  // selected direction is valid,ignore neautral
+               2) // speed limit only when changing F to R or R to F, note
+                  // last selected direction is valid,ignore neautral
     {
       if (userDirSelection != 0 &&
           userDirSelection !=
@@ -282,13 +290,13 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
           if (Param::GetBool(Param::din_brake) && ChangeLim == 2) {
             selectedDir = userDirSelection;
             prevValidDir =
-                selectedDir; // update only when its a valid forward or reverse
-                             // action under speed threshold
+                selectedDir; // update only when its a valid forward or
+                             // reverse action under speed threshold
           } else if (ChangeLim == 1) {
             selectedDir = userDirSelection;
             prevValidDir =
-                selectedDir; // update only when its a valid forward or reverse
-                             // action under speed threshold
+                selectedDir; // update only when its a valid forward or
+                             // reverse action under speed threshold
           }
         }
       } else {
@@ -739,8 +747,8 @@ void GS450hOilPump(uint16_t pumpdc) {
   if (Param::GetInt(Param::PumpPWM) == 0) // If Pump PWM out is set to Oil Pump
   {
     if (pumpdc > 9) {
-      pumpdc =
-          utils::change(pumpdc, 10, 80, 1875, 425); // map oil pump pwm to timer
+      pumpdc = utils::change(pumpdc, 10, 80, 1875,
+                             425); // map oil pump pwm to timer
       pumpdc =
           pumpdc *
           0.5; // Scalar increase 2x so duty is period is halved and so is DC.
