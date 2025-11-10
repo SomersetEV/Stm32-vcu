@@ -1,10 +1,8 @@
-
 /*
- * This file is part of the ZombieVeter project.
+ * This file is part of the ZombieVerter project.
  *
- * Copyright (C) 2020 Johannes Huebner <dev@johanneshuebner.com>
+ * Copyright (C) 2018 Johannes Huebner <dev@johanneshuebner.com>
  *               2021-2022 Damien Maguire <info@evbmw.com>
- * Yes I'm really writing software now........run.....run away.......
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,24 +17,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef PWMHEATER_H
+#define PWMHEATER_H
 
-#ifndef EXTCHARGER_H
-#define EXTCHARGER_H
+#include <heater.h>
+#include <libopencm3/stm32/timer.h>
 
-/*  This library supports the various opensource tesla charger controllers e.g.
- * PCS , Gen2/3 etc. */
-
-#include "chargerhw.h"
-#include "digio.h"
-#include "iomatrix.h"
-#include <stdint.h>
-
-class extCharger : public Chargerhw {
-
+class PWMHeater : public Heater {
 public:
-  bool ControlCharge(bool RunCh, bool ACReq);
-
-private:
+  /** Default constructor */
+  PWMHeater();
+  void SetTargetTemperature(float temp) { (void)temp; } // Not supported (yet)?
+  void SetPower(uint16_t power, bool HeatReq);
 };
 
-#endif /* EXTCHARGER_H */
+#endif // PWMHEATER_H

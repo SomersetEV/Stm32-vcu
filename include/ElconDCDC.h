@@ -1,10 +1,7 @@
-
 /*
- * This file is part of the ZombieVeter project.
+ * This file is part of the ZombieVerter project.
  *
- * Copyright (C) 2020 Johannes Huebner <dev@johanneshuebner.com>
- *               2021-2022 Damien Maguire <info@evbmw.com>
- * Yes I'm really writing software now........run.....run away.......
+ * Copyright (C) 2023 Damien Maguire
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,23 +17,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EXTCHARGER_H
-#define EXTCHARGER_H
-
-/*  This library supports the various opensource tesla charger controllers e.g.
- * PCS , Gen2/3 etc. */
-
-#include "chargerhw.h"
-#include "digio.h"
-#include "iomatrix.h"
+#ifndef ElconDCDC_H
+#define ElconDCDC_H
+#include "dcdc.h"
 #include <stdint.h>
 
-class extCharger : public Chargerhw {
+/* This is an interface for Elcon Chargers that require DC-DC messages
 
+ */
+
+class ElconDCDC : public DCDC {
 public:
-  bool ControlCharge(bool RunCh, bool ACReq);
+  void DecodeCAN(int, uint8_t *);
+  void DeInit() {};
+  void Task100Ms();
+  void SetCanInterface(CanHardware *c);
+
+protected:
+  CanHardware *can;
 
 private:
+  uint8_t timer200 = 0;
 };
-
-#endif /* EXTCHARGER_H */
+#endif // ElconDCDC_H
