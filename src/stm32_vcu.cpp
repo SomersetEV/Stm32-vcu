@@ -335,8 +335,8 @@ static void Ms200Task(void) {
     if (selectedBMS->MaxChargeCurrent() ==
         0) // BMS can command an AC charge shutdown if its current limit is 0
     {
-      //RunChg = false; // end charge
-      //ChgLck = true;  // set charge lockout flag
+      // RunChg = false; // end charge
+      // ChgLck = true;  // set charge lockout flag
     }
   }
   // End Charge Term Logic
@@ -515,11 +515,11 @@ static void Ms100Task(void) {
                             100));        // map threshold to 0 and full to 100
         Param::SetInt(Param::HeatReq, 1); // On
         IOMatrix::GetPin(IOMatrix::HEATERENABLE)
-        ->Set(); // Heater enable and coolant pump on
+            ->Set(); // Heater enable and coolant pump on
       } else {
         Param::SetInt(Param::HeatReq, 0); // Off
         IOMatrix::GetPin(IOMatrix::HEATERENABLE)
-        ->Clear(); // Heater enable and coolant pump on
+            ->Clear(); // Heater enable and coolant pump on
       }
     } else if (Param::GetInt(Param::HeatPotDir) == 0 ||
                Param::GetInt(Param::HeatPotDir) ==
@@ -600,14 +600,14 @@ static void ControlCabHeater(int opmode) {
   // preheat What about charge mode and timer mode?
   if ((opmode == MOD_RUN && Param::GetInt(Param::Control) >= 1) ||
       opmode == MOD_PREHEAT) {
-   // IOMatrix::GetPin(IOMatrix::HEATERENABLE)
-   //     ->Set(); // Heater enable and coolant pump on
+    // IOMatrix::GetPin(IOMatrix::HEATERENABLE)
+    //     ->Set(); // Heater enable and coolant pump on
     selectedHeater->SetTargetTemperature(50); // TODO: Currently does nothing
     selectedHeater->SetPower(Param::GetInt(Param::HeatPwr),
                              Param::GetBool(Param::HeatReq));
   } else {
-   // IOMatrix::GetPin(IOMatrix::HEATERENABLE)
-   //     ->Clear(); // Disable heater and coolant pump
+    // IOMatrix::GetPin(IOMatrix::HEATERENABLE)
+    //     ->Clear(); // Disable heater and coolant pump
     selectedHeater->SetPower(0, 0);
   }
 }
@@ -739,10 +739,10 @@ static void Ms10Task(void) {
       DigIo::prec_out.Clear();
     }
 
-    if (Param::GetInt(Param::pot) < Param::GetInt(Param::potmin)) { 
+    if (Param::GetInt(Param::pot) < Param::GetInt(Param::potmin)) {
       if (selectedVehicle->Start() && selectedVehicle->Ready() &&
           (HVILok > 0) && (!(Param::GetBool(Param::din_forward))) &&
-            (!Param::GetBool(Param::din_reverse))) { 
+          (!Param::GetBool(Param::din_reverse))) {
         StartSig = true;
         opmode = MOD_PRECHARGE; // proceed to precharge if 1)throttle not
                                 // pressed , 2)ign on , 3)start signal rx, 4) HV
