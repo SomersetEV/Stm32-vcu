@@ -568,12 +568,12 @@ static void Ms100Task(void) {
   }
 
   // Reading HV Isolation
-  if (Param::GetInt(Param::BMS_IsoMeas) < 3200 && > 2) {
+  if (Param::GetInt(Param::BMS_IsoMeas) < 3200 &&
+      Param::GetInt(Param::BMS_IsoMeas) > 2) {
     ErrorMessage::Post(ERR_HVISOERR);
     HViso = 1;
   } else {
     HViso = 0;
- 
   }
 
   // Cooling Fan Control//
@@ -751,7 +751,8 @@ static void Ms10Task(void) {
 
     if (Param::GetInt(Param::pot) < Param::GetInt(Param::potmin)) {
       if (selectedVehicle->Start() && selectedVehicle->Ready() &&
-          (HVILok > 0) && (HViso > 0) && (!(Param::GetBool(Param::din_forward))) &&
+          (HVILok > 0) && (HViso > 0) &&
+          (!(Param::GetBool(Param::din_forward))) &&
           (!Param::GetBool(Param::din_reverse))) {
         StartSig = true;
         opmode = MOD_PRECHARGE; // proceed to precharge if 1)throttle not
