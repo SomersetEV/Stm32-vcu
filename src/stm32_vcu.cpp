@@ -571,9 +571,9 @@ static void Ms100Task(void) {
   if (Param::GetInt(Param::BMS_IsoMeas) < 3200 &&
       Param::GetInt(Param::BMS_IsoMeas) > 2) {
     ErrorMessage::Post(ERR_HVISOERR);
-    HViso = 1;
-  } else {
     HViso = 0;
+  } else {
+    HViso = 1;
   }
 
   // Cooling Fan Control//
