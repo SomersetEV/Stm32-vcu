@@ -147,6 +147,7 @@ static bool OutlanderCAN = false;
 static bool ExtHVreq = false;
 static bool CheckHVIL = 0;
 static bool HVILok = 0;
+static bool HViso = 0;
 
 static volatile unsigned days = 0, hours = 0, minutes = 0, seconds = 0,
                          alarm = 0; // != 0 when alarm is pending
@@ -566,6 +567,15 @@ static void Ms100Task(void) {
     HVILok = 1;
   }
 
+  // Reading HV Isolation
+  if (Param::GetInt(Param::BMS_IsoMeas) < 3200 && > 2) {
+    ErrorMessage::Post(ERR_HVISOERR);
+    HViso = 1;
+  } else {
+    HViso = 0;
+ 
+  }
+
   // Cooling Fan Control//
   if (opmode == MOD_CHARGE || opmode == MOD_RUN) {
     float tempTemp =
@@ -741,13 +751,14 @@ static void Ms10Task(void) {
 
     if (Param::GetInt(Param::pot) < Param::GetInt(Param::potmin)) {
       if (selectedVehicle->Start() && selectedVehicle->Ready() &&
-          (HVILok > 0) && (!(Param::GetBool(Param::din_forward))) &&
+          (HVILok > 0) && (HViso > 0) && (!(Param::GetBool(Param::din_forward))) &&
           (!Param::GetBool(Param::din_reverse))) {
         StartSig = true;
         opmode = MOD_PRECHARGE; // proceed to precharge if 1)throttle not
                                 // pressed , 2)ign on , 3)start signal rx, 4) HV
                                 // IL input is grounded if selected.
                                 // 5) neither forward or reverse is selected
+                                // 6) HV isolation reading is ok
         rlyDly = 25;            // Recharge sequence timer
         vehicleStartTime = rtc_get_counter_val();
         initbyStart = true;

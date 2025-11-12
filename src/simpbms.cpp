@@ -34,6 +34,7 @@ void SimpBMS::SetCanInterface(CanHardware *c) {
   can->RegisterUserMessage(0x351);
   can->RegisterUserMessage(0x356);
   can->RegisterUserMessage(0x355);
+  can->RegisterUserMessage(0x35B);
 }
 
 bool SimpBMS::BMSDataValid() {
@@ -103,6 +104,11 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
 
   } else if (id == 0x355) {
     stateOfCharge = data[0] | (data[1] << 8); // comes in 1% scale
+  } else if (id == 0x35B) {
+
+    uint16_t IsoTemp = (int16_t)(data[0] | (data[1] << 8));
+
+    Param::SetInt(Param::BMS_IsoMeas, IsoTemp);
   }
 }
 
