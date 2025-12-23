@@ -59,7 +59,7 @@ void GetDigInputs(CanHardware *can) {
     ErrorMessage::Post(ERR_CANTIMEOUT);
   }
 
-  Param::SetInt(Param::din_cruise, ((canio & CAN_IO_CRUISE) != 0));
+  Param::SetInt(Param::din_HVreq, DigIo::HV_req.Get());
   Param::SetInt(Param::din_start,
                 DigIo::start_in.Get() | ((canio & CAN_IO_START) != 0));
   Param::SetInt(Param::din_brake,
@@ -484,7 +484,15 @@ float ProcessUdc(int motorSpeed) {
 float ProcessThrottle(int speed) {
   float finalSpnt;
 
-  Throttle::throttleRamp = Param::GetFloat(Param::throtramp);
+  if (speed < Param::GetInt(Param::throtramprpm))
+  {
+    Throttle::throttleRamp = Param::GetFloat(Param::throtramp);
+  }
+
+  else
+  {
+    Throttle::throttleRamp = Param::GetAttrib(Param::throtramp)->max;
+  }
 
   finalSpnt = utils::GetUserThrottleCommand();
 
@@ -500,8 +508,6 @@ float ProcessThrottle(int speed) {
   MAX(cruiseThrottle, finalSpnt);
   }
   */
-  // finalSpnt = Throttle::RampThrottle(finalSpnt); //OLD - Throttle ramping
-  // reorganised in V2.30A
 
   Throttle::UdcLimitCommand(finalSpnt, Param::GetFloat(Param::udc));
   Throttle::IdcLimitCommand(finalSpnt, ABS(Param::GetFloat(Param::idc)));
