@@ -68,7 +68,7 @@
   PARAM_ENTRY(CAT_THROTTLE, DirChangeRpm, "rpm", 0, 20000, 500, 139)           \
   PARAM_ENTRY(CAT_THROTTLE, reversemotor, ONOFF, 0, 1, 0, 127)                 \
   PARAM_ENTRY(CAT_THROTTLE, throtramp, "%/10ms", 1, 100, 10, 13)               \
-  PARAM_ENTRY(CAT_THROTTLE, throtramprpm,"rpm", 0, 20000, 20000, 14 )          \
+  PARAM_ENTRY(CAT_THROTTLE, throtramprpm, "rpm", 0, 20000, 20000, 14)          \
   PARAM_ENTRY(CAT_THROTTLE, revlim, "rpm", 0, 20000, 6000, 15)                 \
   PARAM_ENTRY(CAT_THROTTLE, revRegen, ONOFF, 0, 1, 0, 137)                     \
   PARAM_ENTRY(CAT_THROTTLE, udcmin, "V", 0, 1000, 450, 19)                     \
@@ -209,7 +209,7 @@
   VALUE_ENTRY(FrontRearBal, "%", 2082)                                         \
   VALUE_ENTRY(cruisespeed, "rpm", 2033)                                        \
   VALUE_ENTRY(cruisestt, CRUISESTATES, 2034)                                   \
-  VALUE_ENTRY(din_HVreq, ONOFF, 2035)                                         \
+  VALUE_ENTRY(din_HVreq, ONOFF, 2035)                                          \
   VALUE_ENTRY(din_start, ONOFF, 2036)                                          \
   VALUE_ENTRY(din_brake, ONOFF, 2037)                                          \
   VALUE_ENTRY(din_forward, ONOFF, 2038)                                        \
@@ -264,16 +264,16 @@
   VALUE_ENTRY(compressRPM, "", 2109)                                           \
   VALUE_ENTRY(PWMHeatOn, ONOFF, 2112)                                          \
   VALUE_ENTRY(uptime, "sec", 2113)                                             \
-  VALUE_ENTRY(MG1Torque,"", 2114 ) \
-  VALUE_ENTRY(MG2Torque,"", 2115 ) \
-  VALUE_ENTRY(MG1Raw, "", 2116 ) \
-  VALUE_ENTRY(MG2Raw, "", 2117 ) \
-  VALUE_ENTRY(MG1Raw2,"", 2118 ) \
-  VALUE_ENTRY(DMA_RxComplete, ONOFF, 2119 ) \
-  VALUE_ENTRY(DMA_TxComplete, ONOFF, 2120 ) \
-  VALUE_ENTRY(DMA_RxTimeout,  "", 2121 ) \
-  VALUE_ENTRY(DMA_ConsecFail, "", 2122 ) \
-  VALUE_ENTRY(HTM_State,      "", 2123 ) \
+  VALUE_ENTRY(MG1Torque, "", 2114)                                             \
+  VALUE_ENTRY(MG2Torque, "", 2115)                                             \
+  VALUE_ENTRY(MG1Raw, "", 2116)                                                \
+  VALUE_ENTRY(MG2Raw, "", 2117)                                                \
+  VALUE_ENTRY(MG1Raw2, "", 2118)                                               \
+  VALUE_ENTRY(DMA_RxComplete, ONOFF, 2119)                                     \
+  VALUE_ENTRY(DMA_TxComplete, ONOFF, 2120)                                     \
+  VALUE_ENTRY(DMA_RxTimeout, "", 2121)                                         \
+  VALUE_ENTRY(DMA_ConsecFail, "", 2122)                                        \
+  VALUE_ENTRY(HTM_State, "", 2123)
 
 // Next value Id: 2124
 

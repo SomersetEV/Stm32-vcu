@@ -18,8 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "my_math.h"
 #include "throttle.h"
+#include "my_math.h"
 
 #define POT_SLACK 200
 
@@ -265,7 +265,7 @@ float Throttle::RampThrottle(float potnom) {
       potnom = throttleRamped;
     }
   } else //(potnom < throttleRamped) // lower throttle command than currently
-         //applied
+         // applied
   {
     if (potnom >= 0) {
       throttleRamped = potnom; // No ramping from high throttle to low throttle
