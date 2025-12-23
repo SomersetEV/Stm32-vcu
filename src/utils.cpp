@@ -484,13 +484,9 @@ float ProcessUdc(int motorSpeed) {
 float ProcessThrottle(int speed) {
   float finalSpnt;
 
-  if (speed < Param::GetInt(Param::throtramprpm))
-  {
+  if (speed < Param::GetInt(Param::throtramprpm)) {
     Throttle::throttleRamp = Param::GetFloat(Param::throtramp);
-  }
-
-  else
-  {
+  } else {
     Throttle::throttleRamp = Param::GetAttrib(Param::throtramp)->max;
   }
 
