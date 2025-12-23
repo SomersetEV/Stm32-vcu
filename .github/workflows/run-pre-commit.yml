@@ -15,5 +15,6 @@ jobs:
 
     - name: Run pre-commit
       uses: pre-commit/action@v3.0.1
-        with:
-            auto-commit: true
+      with:
+        extra_args: clang-format -i
+      
