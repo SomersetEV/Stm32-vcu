@@ -7,6 +7,7 @@ If you want to open a pull request, remember to checkout the damienmaguire:Devel
 
 ## Code formatting
 The project enforces a specific code formatting in the workflows. To get your code formatted properly, it is easiest to use a pre-commit hook before pushing the code to a pull request.
+This site can help you with formatting your code to the LLVM standard as used in this project https://formatter.org/cpp-formatter
 
 Before you begin, make sure you have installed Python on the system!
 To install the pre-commit, open the repository via Git Bash/CMD, and run
