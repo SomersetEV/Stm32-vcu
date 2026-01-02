@@ -335,16 +335,6 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x00;
     can->Send(0x322, (uint32_t *)bytes, 8);
-
-    bytes[0] = 0x00;
-    bytes[1] = 0x28;
-    bytes[2] = 0x00;
-    bytes[3] = 0x00;
-    bytes[4] = 0x10;
-    bytes[5] = 0x43;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
-    can->Send(0x394, (uint32_t *)bytes, 8);
   }
   if (clearToStart) {
     if (actVolts < Param::GetInt(Param::Voltspnt))
@@ -352,7 +342,7 @@ void MGgen2V2Lcharger::Task100Ms() {
     if (actVolts >= Param::GetInt(Param::Voltspnt))
       currentRamp--;
     if (currentRamp >= 0x28)
-      currentRamp = 0x28; // clamp to max of 40A
+      currentRamp = 0x09; // testing max amp of 9, normally clamp to max of 40A = 28
 
     bytes[0] = 0x28;
     bytes[1] = 0x89;
