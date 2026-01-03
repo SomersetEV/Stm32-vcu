@@ -35,6 +35,7 @@ float MGgen2V2Lcharger::LV_Volts;
 float MGgen2V2Lcharger::LV_Amps;
 uint16_t MGgen2V2Lcharger::batteryVolts;
 static uint8_t PlugStat = 0;
+static bool PPStat = false;
 
 bool MGgen2V2Lcharger::ControlCharge(bool RunCh, bool ACReq) {
   int chgmode = Param::GetInt(Param::interface);
@@ -264,18 +265,18 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x00;
     can->Send(0x348, (uint32_t *)bytes, 8);
+    /*
+        bytes[0] = 0x00;
+        bytes[1] = 0x28;
+        bytes[2] = 0x00;
+        bytes[3] = 0x00;
+        bytes[4] = setVolts >> 8;
+        bytes[5] = setVolts & 0xff;
+        bytes[6] = 0x00;
+        bytes[7] = 0x00;
 
-    bytes[0] = 0x00;
-    bytes[1] = currentRamp;
-    bytes[2] = 0x00;
-    bytes[3] = 0x00;
-    bytes[4] = setVolts >> 8;
-    bytes[5] = setVolts & 0xff;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
-
-    can->Send(0x394, (uint32_t *)bytes, 8);
-
+        can->Send(0x394, (uint32_t *)bytes, 8);
+    */
     bytes[0] = 0x44;
     bytes[1] = 0x6E;
     bytes[2] = 0xB4;
@@ -346,14 +347,17 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x394, (uint32_t *)bytes, 8);
   }
+
   if (clearToStart) {
+    /* /// has no effect was for Id 394
     if (actVolts < Param::GetInt(Param::Voltspnt))
       currentRamp++;
     if (actVolts >= Param::GetInt(Param::Voltspnt))
       currentRamp--;
-    if (currentRamp >= 0x28)
-      currentRamp = 0x28; // clamp to max of 40A
-
+    if (currentRamp >= 0x09)
+      currentRamp =
+          0x09; // test max amps of 9 amps. otherwise clamp to max of 40A = 0x28
+*/
     bytes[0] = 0x28;
     bytes[1] = 0x89;
     bytes[2] = 0x07;
@@ -547,6 +551,11 @@ void MGgen2V2Lcharger::handle323(uint32_t data[2]) {
       (uint8_t *)data; // arrgghhh this converts the two 32bit array into bytes.
                        // See comments are useful:
   PlugStat = bytes[5];
+  if (PlugStat == 1)
+    PPStat = true; // plug inserted
+  else
+    PPStat = false; // plug not inserted
+  Param::SetInt(Param::PlugDet, PPStat);
 }
 /*
 void MGgen2V2Lcharger::handle38A(uint32_t data[2])
