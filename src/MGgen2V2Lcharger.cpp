@@ -172,22 +172,9 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x46;                        // 46 start V2l? or 48
     can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
-
-    bytes[0] = 0x3B;
-    bytes[1] = 0xCA;
-    bytes[2] = 0x86;
-    bytes[3] = 0x02;
-    bytes[4] = 0xFD;
-    bytes[5] = 0x60;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
-    can->Send(0x29B, (uint32_t *)bytes, 8);
   }
 
   if (opmode == MOD_CHARGE) {
-
-    setVolts = Param::GetInt(Param::Voltspnt) * 10;
-    actVolts = Param::GetInt(Param::udc);
     /*
     bytes[0] = 0x06;
     bytes[1] = 0xA0;
@@ -265,18 +252,17 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x00;
     can->Send(0x348, (uint32_t *)bytes, 8);
-    /*
-        bytes[0] = 0x00;
-        bytes[1] = 0x28;
-        bytes[2] = 0x00;
-        bytes[3] = 0x00;
-        bytes[4] = setVolts >> 8;
-        bytes[5] = setVolts & 0xff;
-        bytes[6] = 0x00;
-        bytes[7] = 0x00;
 
-        can->Send(0x394, (uint32_t *)bytes, 8);
-    */
+    bytes[0] = 0x00;
+    bytes[1] = 0x28;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x10;
+    bytes[5] = 0x43;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x394, (uint32_t *)bytes, 8);
+
     bytes[0] = 0x44;
     bytes[1] = 0x6E;
     bytes[2] = 0xB4;
@@ -347,17 +333,8 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x394, (uint32_t *)bytes, 8);
   }
-
   if (clearToStart) {
-    /* /// has no effect was for Id 394
-    if (actVolts < Param::GetInt(Param::Voltspnt))
-      currentRamp++;
-    if (actVolts >= Param::GetInt(Param::Voltspnt))
-      currentRamp--;
-    if (currentRamp >= 0x09)
-      currentRamp =
-          0x09; // test max amps of 9 amps. otherwise clamp to max of 40A = 0x28
-*/
+
     bytes[0] = 0x28;
     bytes[1] = 0x89;
     bytes[2] = 0x07;
