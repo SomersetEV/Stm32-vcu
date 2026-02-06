@@ -129,6 +129,16 @@ void MGgen2V2Lcharger::DecodeCAN(int id, uint32_t data[2]) {
 
 void MGgen2V2Lcharger::Task100Ms() {
   int opmode = Param::GetInt(Param::opmode);
+
+  setVolts = Param::GetInt(Param::Voltspnt);
+  if (setVolts < 350.0f)
+    setVolts = 350.0f; // minimum voltage
+  if (setVolts > 403.0f)
+    setVolts = 403.0f; // maxiumum voltage
+
+  uint8_t voltagesetpoint =
+      static_cast<uint8_t>((setVolts - 38.0f) / 5.0f + 0.5f);
+
   uint8_t bytes[8];
   if (opmode == MOD_RUN) // do some DC-DC stuff
   {
@@ -222,57 +232,7 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x00;
     can->Send(0x29B, (uint32_t *)bytes, 8);
-    /*
-        bytes[0] = 0x00;
-        bytes[1] = 0x00;
-        bytes[2] = 0x00;
-        bytes[3] = 0x00;
-        bytes[4] = 0x00;
-        bytes[5] = 0x00;
-        bytes[6] = 0x00;
-        bytes[7] = 0x00;
-        //can->Send(0x32E, (uint32_t *)bytes, 8);
 
-        bytes[0] = 0x00;
-        bytes[1] = 0x00;
-        bytes[2] = 0x00;
-        bytes[3] = 0x00;
-        bytes[4] = 0x00;
-        bytes[5] = 0x00;
-        bytes[6] = 0x00;
-        bytes[7] = 0x00;
-        //can->Send(0x343, (uint32_t *)bytes, 8);
-
-        bytes[0] = 0x00;
-        bytes[1] = 0x00;
-        bytes[2] = 0x00;
-        bytes[3] = 0x00;
-        bytes[4] = 0x00;
-        bytes[5] = 0x00;
-        bytes[6] = 0x00;
-        bytes[7] = 0x00;
-        //can->Send(0x348, (uint32_t *)bytes, 8);
-
-        bytes[0] = 0x44;
-        bytes[1] = 0x6E;
-        bytes[2] = 0xB4;
-        bytes[3] = 0x28;
-        bytes[4] = 0x80;
-        bytes[5] = 0x4E;
-        bytes[6] = 0x4E;
-        bytes[7] = 0x4D;
-        //can->Send(0x396, (uint32_t *)bytes, 8);
-
-        bytes[0] = 0x00;
-        bytes[1] = 0x43;
-        bytes[2] = 0x00;
-        bytes[3] = 0x00;
-        bytes[4] = 0xCD;
-        bytes[5] = 0x00;
-        bytes[6] = 0x00;
-        bytes[7] = 0x00;
-        //can->Send(0x39A, (uint32_t *)bytes, 8);
-    */
     bytes[0] = 0x44;
     bytes[1] = 0x43;
     bytes[2] = 0x9D;
@@ -292,16 +252,6 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x41;
     can->Send(0x33F, (uint32_t *)bytes, 8);
-
-    bytes[0] = 0x06;
-    bytes[1] = 0xA0;
-    bytes[2] = 0x26;
-    bytes[3] = 0x00;
-    bytes[4] = 0x00;
-    bytes[5] = 0x00;
-    bytes[6] = 0x00;
-    bytes[7] = 0x7F;
-    can->Send(0x19C, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x00;
     bytes[1] = 0x00;
@@ -325,28 +275,47 @@ void MGgen2V2Lcharger::Task100Ms() {
   }
   if (clearToStart) {
 
+    bytes[0] = 0x28;
+    bytes[1] = 0x89;
+    bytes[2] = 0x07;
+    bytes[3] = 0xFE;
+    bytes[4] = 0x00;
+    bytes[5] = 0xDC;
+    bytes[6] = voltagesetpoint;
+    bytes[7] = 0x12;
+    can->Send(0x29C, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x26; // 26 for on, 06 for off
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t *)bytes, 8);
+
+  } else {
+
     bytes[0] = 0x00;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = 0x47;
+    bytes[6] = 0x00;
     bytes[7] = 0x12;
     can->Send(0x29C, (uint32_t *)bytes, 8);
 
-  } else {
-/*
-    bytes[0] = 0x28;
-    bytes[1] = 0xFF;
-    bytes[2] = 0x83;
-    bytes[3] = 0xFF;
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x06; // 26 for on, 06 for off
+    bytes[3] = 0x00;
     bytes[4] = 0x00;
-    bytes[5] = 0xFF;
-    bytes[6] = 0x7F;
-    bytes[7] = 0xFF;
-    // can->Send(0x29C, (uint32_t *)bytes, 8); 
-    */
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t *)bytes, 8);
   }
 }
 

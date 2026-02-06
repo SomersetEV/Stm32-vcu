@@ -45,8 +45,8 @@ public:
 private:
   int opmode;
   uint16_t setVolts, actVolts, termAmps;
+  uint8_t voltagesetpoint;
   int16_t actAmps;
-  uint8_t currentRamp;
   bool clearToStart = false, shutDownReq = false, pwmON = false;
   static uint8_t chgStatus, evseDuty;
   static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
