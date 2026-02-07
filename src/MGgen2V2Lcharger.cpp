@@ -130,14 +130,15 @@ void MGgen2V2Lcharger::DecodeCAN(int id, uint32_t data[2]) {
 void MGgen2V2Lcharger::Task100Ms() {
   int opmode = Param::GetInt(Param::opmode);
 
+  // set max voltage on charger
   setVolts = Param::GetInt(Param::Voltspnt);
-  if (setVolts < 350.0f)
-    setVolts = 350.0f; // minimum voltage
-  if (setVolts > 403.0f)
-    setVolts = 403.0f; // maxiumum voltage
+  if (setVolts < 353.0f)
+    setVolts = 353.0f; // minimum voltage
+  if (setVolts > 453.0f)
+    setVolts = 450; // maxiumum voltage
 
-  uint8_t voltagesetpoint =
-      static_cast<uint8_t>((setVolts - 38.0f) / 5.0f + 0.5f);
+  // Convert voltage to 16-bit value (multiply by 50)
+  uint16_t voltage_encoded = static_cast<uint16_t>(setVolts * 50.0f);
 
   uint8_t bytes[8];
   if (opmode == MOD_RUN) // do some DC-DC stuff
@@ -201,7 +202,7 @@ void MGgen2V2Lcharger::Task100Ms() {
     CCS charging bytes[2] = 0x00; bytes[3] = 0x00; bytes[4] = 0x00; bytes[5] =
     0x00; bytes[6] = 0x20; // 20 to wake up charger. bytes[7] = 0x00;
     can->Send(0x297, (uint32_t*)bytes, 8); // 297 is BMS state
-*/
+  */
     bytes[0] = 0x0E; // 0E to wake up
     bytes[1] = 0x00;
     bytes[2] = 0x00;
@@ -272,17 +273,28 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[6] = 0x00;
     bytes[7] = 0x00;
     can->Send(0x394, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x26; // 26 for on, 06 for off
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t *)bytes, 8);
   }
   if (clearToStart) {
-
     bytes[0] = 0x28;
     bytes[1] = 0x89;
     bytes[2] = 0x07;
     bytes[3] = 0xFE;
     bytes[4] = 0x00;
     bytes[5] = 0xDC;
-    bytes[6] = voltagesetpoint;
-    bytes[7] = 0x12;
+    bytes[6] = (voltage_encoded >> 8) & 0xFF;
+    bytes[7] = voltage_encoded & 0xFF;
+    // bytes[6] = voltagesetpoint;
+    // bytes[7] = 0x00;
     can->Send(0x29C, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x06;
@@ -296,7 +308,6 @@ void MGgen2V2Lcharger::Task100Ms() {
     can->Send(0x19C, (uint32_t *)bytes, 8);
 
   } else {
-
     bytes[0] = 0x00;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
