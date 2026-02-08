@@ -107,6 +107,7 @@ void MGgen2V2Lcharger::SetCanInterface(CanHardware *c) {
   can->RegisterUserMessage(0x324);
   can->RegisterUserMessage(0x39F);
   can->RegisterUserMessage(0x323);
+  can->RegisterUserMessage(0x33B);
   // can->RegisterUserMessage(0x326);//test
 }
 
@@ -505,11 +506,12 @@ void MGgen2V2Lcharger::handle323(uint32_t data[2]) {
     PPStat = false; // plug not inserted
   Param::SetInt(Param::PlugDet, PPStat);
 }
-/*
-void MGgen2V2Lcharger::handle38A(uint32_t data[2])
 
-{
+void MGgen2V2Lcharger::handle33B(uint32_t data[2]) {
 
+  uint8_t *bytes =
+      (uint8_t *)data; // arrgghhh this converts the two 32bit array into bytes.
+                       // See comments are useful:
+  temp_1 = bytes[3] - 50;
+  Param::SetInt(Param::ChgTemp, temp_1);
 }
-
-*/
