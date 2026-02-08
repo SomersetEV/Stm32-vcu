@@ -182,7 +182,7 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[4] = 0x28;
     bytes[5] = 0x00;
     bytes[6] = 0x00;
-    bytes[7] = 0x46;                        // 46 start V2l? or 48
+    bytes[7] = 0x48;                        // 48 to start V2L
     can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
   }
 
