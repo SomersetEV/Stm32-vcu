@@ -138,8 +138,8 @@ void MGgen2V2Lcharger::Task100Ms() {
   if (setVolts > 453.0f)
     setVolts = 450; // maxiumum voltage
 
-  // Convert voltage to 16-bit value (multiply by 50)
-  uint16_t voltage_encoded = static_cast<uint16_t>(setVolts * 50.0f);
+  // Convert voltage to 16-bit value (multiply by 50). Add a 0.5v offset, otherwise it ramps down so slowly it will never hit vltspnt
+  uint16_t voltage_encoded = static_cast<uint16_t>((setVolts + 0.5) * 50.0f);
 
   uint8_t bytes[8];
   if (opmode == MOD_RUN) // do some DC-DC stuff
