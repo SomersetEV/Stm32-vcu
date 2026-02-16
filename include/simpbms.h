@@ -44,5 +44,9 @@ private:
   float minTempC = 0;
   float maxTempC = 0;
   float SoC;
+  float current = 0;
+  float stateOfCharge;
+  float batteryVoltage = 500; // higher than possible so cannot complete
+                              // precharge until BMS reports battery voltage
 };
 #endif // SIMPBMS_H

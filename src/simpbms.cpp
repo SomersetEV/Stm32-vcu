@@ -33,6 +33,7 @@ void SimpBMS::SetCanInterface(CanHardware *c) {
   can->RegisterUserMessage(0x373);
   can->RegisterUserMessage(0x351);
   can->RegisterUserMessage(0X355);
+  can->RegisterUserMessage(0x356);
   can->RegisterUserMessage(0X36A);
 }
 
@@ -96,6 +97,14 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
     Param::SetFloat(Param::SOC, SoC);
   } else if (id == 0x36A) {
     HVon = (data[1] >> 5) & 1;
+  } else if (id == 0x356) {
+    batteryVoltage = (data[0] | (data[1] << 8)) * 0.01; // comes in 0.01V scale
+
+    int16_t rawCurrent = (int16_t)(data[2] | (data[3] << 8));
+    current =
+        rawCurrent * 0.1f; // comes in 0.1A scale
+                           // Reset timeout counter to the full timeout value
+    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
   }
 }
 
@@ -117,5 +126,20 @@ void SimpBMS::Task100Ms() {
     Param::SetFloat(Param::BMS_Vmax, 0);
     Param::SetFloat(Param::BMS_Tmin, 0);
     Param::SetFloat(Param::BMS_Tmax, 0);
+  }
+
+  if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
+  {
+    Param::SetFloat(Param::udc2, batteryVoltage);
+    Param::SetFloat(Param::udc, batteryVoltage);
+    Param::SetFloat(Param::udcsw, batteryVoltage - 30);
+    Param::SetFloat(Param::SOC, stateOfCharge);
+
+    if (BMSDataValid()) {
+      Param::SetFloat(Param::idc, current);
+    } else {
+      Param::SetFloat(Param::idc, 0);
+      Param::SetFloat(Param::udcsw, 500);
+    }
   }
 }

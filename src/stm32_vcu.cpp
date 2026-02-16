@@ -381,7 +381,7 @@ static void Ms100Task(void) {
   } else {
     IOMatrix::GetPin(IOMatrix::REVERSELIGHT)->Clear();
   }
-  if (opmode == MOD_RUN || BMSsimp.GetHVon() == 0x01) {
+  if (opmode == MOD_RUN && BMSsimp.GetHVon() == 0x01) {
     IOMatrix::GetPin(IOMatrix::RUNINDICATION)->Set();
   } else {
     IOMatrix::GetPin(IOMatrix::RUNINDICATION)->Clear();
