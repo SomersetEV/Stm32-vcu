@@ -138,7 +138,8 @@ void MGgen2V2Lcharger::Task100Ms() {
   if (setVolts > 453.0f)
     setVolts = 450; // maxiumum voltage
 
-  // Convert voltage to 16-bit value (multiply by 50). Add a 0.5v offset, otherwise it ramps down so slowly it will never hit vltspnt
+  // Convert voltage to 16-bit value (multiply by 50). Add a 0.5v offset,
+  // otherwise it ramps down so slowly it will never hit vltspnt
   uint16_t voltage_encoded = static_cast<uint16_t>((setVolts + 0.5) * 50.0f);
 
   uint8_t bytes[8];
@@ -380,7 +381,7 @@ void MGgen2V2Lcharger::Off() {
   bytes[4] = 0x28;
   bytes[5] = 0x00;
   bytes[6] = 0x00;
-  bytes[7] = 0x00;                        //
+  bytes[7] = 0x46;                        //
   can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
 
   bytes[0] = 0x00;
@@ -392,16 +393,6 @@ void MGgen2V2Lcharger::Off() {
   bytes[6] = 0x00;
   bytes[7] = 0x00;
   can->Send(0x322, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x00;
-  bytes[1] = 0x00;
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x28;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x41;
-  can->Send(0x33F, (uint32_t *)bytes, 8);
 
   bytes[0] = 0x44;
   bytes[1] = 0x43;
