@@ -47,6 +47,7 @@ private:
   uint16_t setVolts, actVolts, termAmps;
   uint8_t voltagesetpoint;
   int16_t actAmps;
+  float V2Ltimer = 0;
   bool clearToStart = false, shutDownReq = false, pwmON = false;
   static uint8_t chgStatus, evseDuty;
   static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
