@@ -146,6 +146,17 @@ void MGgen2V2Lcharger::Task100Ms() {
   if (opmode == MOD_RUN) // do some DC-DC stuff
   {
     V2Ltimer = V2Ltimer + 1;
+    bytes[0] = 0x80;
+    bytes[1] = 0x04;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x13;
+    bytes[5] = 0x88;
+    bytes[6] = 0x01;
+    bytes[7] = 0x1E;
+    can->Send(0x08E, (uint32_t *)bytes,
+              8); // only need to send this to turn on V2L, but it doesn't hurt
+                  // to send it every 100ms
 
     bytes[0] = 0x06;
     bytes[1] = 0xA0;
@@ -179,7 +190,88 @@ void MGgen2V2Lcharger::Task100Ms() {
     can->Send(0x1F1, (uint32_t *)bytes, 8);
 
     if (V2Ltimer > 50) {
-    V2Ltimer = 51;
+      V2Ltimer = 51;
+      bytes[0] = 0x00;
+      bytes[1] = 0x00;
+      bytes[2] = 0x00;
+      bytes[3] = 0x00;
+      bytes[4] = 0x28;
+      bytes[5] = 0x00;
+      bytes[6] = 0x00;
+      bytes[7] = 0x48;                        // 48 to start V2L
+      can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+    } else {
+      bytes[0] = 0x00;
+      bytes[1] = 0x00;
+      bytes[2] = 0x00;
+      bytes[3] = 0x00;
+      bytes[4] = 0x28;
+      bytes[5] = 0x00;
+      bytes[6] = 0x00;
+      bytes[7] = 0x46;                        // 48 to not V2L
+      can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+    }
+  }
+
+  if (opmode == MOD_CHARGE) {
+    /*
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x26; //26 for on, 06 for off
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t*)bytes, 8);
+
+    bytes[0] = 0x00;
+    bytes[1] = 0x06; // 01 is stand by, 03 is driving, 06 is AC charging, 07 is
+    CCS charging bytes[2] = 0x00; bytes[3] = 0x00; bytes[4] = 0x00; bytes[5] =
+    0x00; bytes[6] = 0x20; // 20 to wake up charger. bytes[7] = 0x00;
+    can->Send(0x297, (uint32_t*)bytes, 8); // 297 is BMS state
+  */
+    bytes[0] = 0x0E; // 0E to wake up
+    bytes[1] = 0x00;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x20;
+    bytes[7] = 0x00;
+    can->Send(0x1F1, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x00;
+    bytes[1] = 0x06; // 01 is stand by, 03 is driving, 06 is AC charging, 07 is
+                     // CCS charging
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x20;
+    bytes[6] = 0x20; // 20 to wake up charger.
+    bytes[7] = 0x00;
+    can->Send(0x297, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x3B;
+    bytes[1] = 0xCA;
+    bytes[2] = 0x86;
+    bytes[3] = 0x00;
+    bytes[4] = 0xFD;
+    bytes[5] = 0x60;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x29B, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x44;
+    bytes[1] = 0x43;
+    bytes[2] = 0x9D;
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x39B, (uint32_t *)bytes, 8);
+
     bytes[0] = 0x00;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
@@ -187,169 +279,90 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[4] = 0x28;
     bytes[5] = 0x00;
     bytes[6] = 0x00;
-    bytes[7] = 0x48;                        // 48 to start V2L
-    can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+    bytes[7] = 0x41;
+    can->Send(0x33F, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x00;
+    bytes[1] = 0x00;
+    bytes[2] = 0x00;
+    bytes[3] = 0x20;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x322, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x00;
+    bytes[1] = 0x28;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x10;
+    bytes[5] = 0x43;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x394, (uint32_t *)bytes, 8);
+
+    /*
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x26; // 26 for on, 06 for off
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t *)bytes, 8);
+    */
+  }
+  if (clearToStart) {
+    bytes[0] = 0x28;
+    bytes[1] = 0x89;
+    bytes[2] = 0x07;
+    bytes[3] = 0xFE;
+    bytes[4] = 0x00;
+    bytes[5] = 0xDC;
+    bytes[6] = (voltage_encoded >> 8) & 0xFF;
+    bytes[7] = voltage_encoded & 0xFF;
+    // bytes[6] = voltagesetpoint;
+    // bytes[7] = 0x00;
+    can->Send(0x29C, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x26; // 26 for on, 06 for off
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t *)bytes, 8);
+
   } else {
     bytes[0] = 0x00;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
     bytes[3] = 0x00;
-    bytes[4] = 0x28;
+    bytes[4] = 0x00;
     bytes[5] = 0x00;
     bytes[6] = 0x00;
-    bytes[7] = 0x46;                        // 48 to not V2L
-    can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+    bytes[7] = 0x12;
+    can->Send(0x29C, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x06;
+    bytes[1] = 0xA0;
+    bytes[2] = 0x06; // 26 for on, 06 for off
+    bytes[3] = 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x7F;
+    can->Send(0x19C, (uint32_t *)bytes, 8);
   }
-}
-
-if (opmode == MOD_CHARGE) {
-  /*
-  bytes[0] = 0x06;
-  bytes[1] = 0xA0;
-  bytes[2] = 0x26; //26 for on, 06 for off
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x7F;
-  can->Send(0x19C, (uint32_t*)bytes, 8);
-
-  bytes[0] = 0x00;
-  bytes[1] = 0x06; // 01 is stand by, 03 is driving, 06 is AC charging, 07 is
-  CCS charging bytes[2] = 0x00; bytes[3] = 0x00; bytes[4] = 0x00; bytes[5] =
-  0x00; bytes[6] = 0x20; // 20 to wake up charger. bytes[7] = 0x00;
-  can->Send(0x297, (uint32_t*)bytes, 8); // 297 is BMS state
-*/
-  bytes[0] = 0x0E; // 0E to wake up
-  bytes[1] = 0x00;
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x20;
-  bytes[7] = 0x00;
-  can->Send(0x1F1, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x00;
-  bytes[1] = 0x06; // 01 is stand by, 03 is driving, 06 is AC charging, 07 is
-                   // CCS charging
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x20;
-  bytes[6] = 0x20; // 20 to wake up charger.
-  bytes[7] = 0x00;
-  can->Send(0x297, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x3B;
-  bytes[1] = 0xCA;
-  bytes[2] = 0x86;
-  bytes[3] = 0x00;
-  bytes[4] = 0xFD;
-  bytes[5] = 0x60;
-  bytes[6] = 0x00;
-  bytes[7] = 0x00;
-  can->Send(0x29B, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x44;
-  bytes[1] = 0x43;
-  bytes[2] = 0x9D;
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x00;
-  can->Send(0x39B, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x00;
-  bytes[1] = 0x00;
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x28;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x41;
-  can->Send(0x33F, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x00;
-  bytes[1] = 0x00;
-  bytes[2] = 0x00;
-  bytes[3] = 0x20;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x00;
-  can->Send(0x322, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x00;
-  bytes[1] = 0x28;
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x10;
-  bytes[5] = 0x43;
-  bytes[6] = 0x00;
-  bytes[7] = 0x00;
-  can->Send(0x394, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x06;
-  bytes[1] = 0xA0;
-  bytes[2] = 0x26; // 26 for on, 06 for off
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x7F;
-  can->Send(0x19C, (uint32_t *)bytes, 8);
-}
-if (clearToStart) {
-  bytes[0] = 0x28;
-  bytes[1] = 0x89;
-  bytes[2] = 0x07;
-  bytes[3] = 0xFE;
-  bytes[4] = 0x00;
-  bytes[5] = 0xDC;
-  bytes[6] = (voltage_encoded >> 8) & 0xFF;
-  bytes[7] = voltage_encoded & 0xFF;
-  // bytes[6] = voltagesetpoint;
-  // bytes[7] = 0x00;
-  can->Send(0x29C, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x06;
-  bytes[1] = 0xA0;
-  bytes[2] = 0x26; // 26 for on, 06 for off
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x7F;
-  can->Send(0x19C, (uint32_t *)bytes, 8);
-
-} else {
-  bytes[0] = 0x00;
-  bytes[1] = 0x00;
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x12;
-  can->Send(0x29C, (uint32_t *)bytes, 8);
-
-  bytes[0] = 0x06;
-  bytes[1] = 0xA0;
-  bytes[2] = 0x06; // 26 for on, 06 for off
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x7F;
-  can->Send(0x19C, (uint32_t *)bytes, 8);
-}
 }
 
 void MGgen2V2Lcharger::Off() {
 
-  V2Ltimer = 0; //reset V2L timer
+  V2Ltimer = 0; // reset V2L timer
   uint8_t bytes[8];
   bytes[0] = 0x26;
   bytes[1] = 0xA0;
