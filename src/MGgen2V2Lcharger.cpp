@@ -146,14 +146,14 @@ void MGgen2V2Lcharger::Task100Ms() {
   if (opmode == MOD_RUN) // do some DC-DC stuff
   {
     V2Ltimer = V2Ltimer + 1;
-    bytes[0] = 0x80;
-    bytes[1] = 0x04;
-    bytes[2] = 0x00;
+    bytes[0] = 0x5D;
+    bytes[1] = 0x05;
+    bytes[2] = 0x04;
     bytes[3] = 0x00;
     bytes[4] = 0x13;
     bytes[5] = 0x88;
-    bytes[6] = 0x01;
-    bytes[7] = 0x1E;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
     can->Send(0x08E, (uint32_t *)bytes,
               8); // only need to send this to turn on V2L, but it doesn't hurt
                   // to send it every 100ms
@@ -189,7 +189,17 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x1F1, (uint32_t *)bytes, 8);
 
-    if (V2Ltimer > 50) {
+    if (V2Ltimer > 25 && V2Ltimer < 50) {
+      bytes[0] = 0x00;
+      bytes[1] = 0x00;
+      bytes[2] = 0x00;
+      bytes[3] = 0x00;
+      bytes[4] = 0x28;
+      bytes[5] = 0x00;
+      bytes[6] = 0x00;
+      bytes[7] = 0x46;                        // 48 to not V2L
+      can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+    } else if (V2Ltimer > 50) {
       V2Ltimer = 51;
       bytes[0] = 0x00;
       bytes[1] = 0x00;
@@ -200,16 +210,18 @@ void MGgen2V2Lcharger::Task100Ms() {
       bytes[6] = 0x00;
       bytes[7] = 0x48;                        // 48 to start V2L
       can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
-    } else {
-      bytes[0] = 0x00;
-      bytes[1] = 0x00;
-      bytes[2] = 0x00;
-      bytes[3] = 0x00;
-      bytes[4] = 0x28;
-      bytes[5] = 0x00;
-      bytes[6] = 0x00;
-      bytes[7] = 0x46;                        // 48 to not V2L
-      can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+      /*} else if (V2Ltimer > 60) {
+
+        bytes[0] = 0x00;
+        bytes[1] = 0x00;
+        bytes[2] = 0x00;
+        bytes[3] = 0x00;
+        bytes[4] = 0x28;
+        bytes[5] = 0x00;
+        bytes[6] = 0x00;
+        bytes[7] = 0x46;                        // 48 to not V2L
+        can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
+      }*/
     }
   }
 
@@ -226,8 +238,8 @@ void MGgen2V2Lcharger::Task100Ms() {
     can->Send(0x1F1, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x00;
-    bytes[1] = 0x06; // 01 is stand by, 03 is driving, 06 is AC charging, 07 is
-                     // CCS charging
+    bytes[1] = 0x06; // 01 is stand by, 03 is driving, 06 is AC charging, 07
+                     // is CCS charging
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
@@ -451,8 +463,8 @@ void MGgen2V2Lcharger::handle324(uint32_t data[2])
 
 {
   uint8_t *bytes =
-      (uint8_t *)data; // arrgghhh this converts the two 32bit array into bytes.
-                       // See comments are useful:)
+      (uint8_t *)data; // arrgghhh this converts the two 32bit array into
+                       // bytes. See comments are useful:)
   batteryVolts = ((bytes[1] << 8) | (bytes[2])) * 0.02;
   ;
 
@@ -469,8 +481,8 @@ void MGgen2V2Lcharger::handle39F(uint32_t data[2])
 
 {
   uint8_t *bytes =
-      (uint8_t *)data; // arrgghhh this converts the two 32bit array into bytes.
-                       // See comments are useful:)
+      (uint8_t *)data; // arrgghhh this converts the two 32bit array into
+                       // bytes. See comments are useful:)
   LV_Volts = bytes[1] / 8;
   LV_Amps = bytes[4];
   Param::SetFloat(Param::U12V, LV_Volts);
@@ -480,8 +492,8 @@ void MGgen2V2Lcharger::handle39F(uint32_t data[2])
 void MGgen2V2Lcharger::handle323(uint32_t data[2]) {
 
   uint8_t *bytes =
-      (uint8_t *)data; // arrgghhh this converts the two 32bit array into bytes.
-                       // See comments are useful:
+      (uint8_t *)data; // arrgghhh this converts the two 32bit array into
+                       // bytes. See comments are useful:
   PlugStat = bytes[5];
   if (PlugStat == 1)
     PPStat = true; // plug inserted
@@ -493,8 +505,8 @@ void MGgen2V2Lcharger::handle323(uint32_t data[2]) {
 void MGgen2V2Lcharger::handle33B(uint32_t data[2]) {
 
   uint8_t *bytes =
-      (uint8_t *)data; // arrgghhh this converts the two 32bit array into bytes.
-                       // See comments are useful:
+      (uint8_t *)data; // arrgghhh this converts the two 32bit array into
+                       // bytes. See comments are useful:
   temp_1 = bytes[3] - 50;
   Param::SetInt(Param::ChgTemp, temp_1);
 }
