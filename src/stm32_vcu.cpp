@@ -631,7 +631,8 @@ static void Ms10Task(void) {
 
     // Soft rev limiter: governor ceiling smoothly reduces torque as speed
     // approaches revlim instead of a hard cut.
-    float governorCeiling = Throttle::CalcCruiseSpeed(ABS(previousSpeed), Param::GetInt(Param::revlim));
+    float governorCeiling = Throttle::CalcCruiseSpeed(
+        ABS(previousSpeed), Param::GetInt(Param::revlim));
     if (torquePercent > governorCeiling)
       torquePercent = governorCeiling;
 
