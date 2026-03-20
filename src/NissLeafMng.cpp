@@ -115,7 +115,7 @@ void NissLeafMng::Task10Ms(int16_t final_torque_request) {
     // 2016: 6E
 
     // Usually 07, but can have values between 07...70 (gen1)
-    bytes[1] = 0xF7; // 0x07; // Lower Torque Limit -2.5Nm/bit Lets for fun
+    bytes[1] = 0x07; // 0x07; // Lower Torque Limit -2.5Nm/bit Lets for fun
                      // allow ALL power
     // 2016: 6E
 
