@@ -292,7 +292,7 @@ float Throttle::CalcCruiseSpeed(int speed, int rpmLimit) {
 
   float potnom = speedkp * speederr;
   potnom = MIN(100, potnom);
-  potnom = MAX(brkcruise, potnom);
+  potnom = MAX(-brkcruise, potnom);
 
   return potnom;
 }
