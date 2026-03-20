@@ -629,6 +629,12 @@ static void Ms10Task(void) {
         ABS(previousSpeed)); // run the throttle reading and checks and then
                              // generate Potnom
 
+    // Soft rev limiter: governor ceiling smoothly reduces torque as speed
+    // approaches revlim instead of a hard cut.
+    float governorCeiling = Throttle::CalcCruiseSpeed(ABS(previousSpeed), Param::GetInt(Param::revlim));
+    if (torquePercent > governorCeiling)
+      torquePercent = governorCeiling;
+
     // When requesting regen we need to be careful. If the car is not rolling
     // in the same direction as the selected gear, we will actually accelerate!
     // Exclude openinverter here because that has its own regen logic
@@ -1294,6 +1300,9 @@ void Param::Change(Param::PARAM_NUM paramNum) {
   // Throttle::udcmin = Param::GetFloat(Param::udcmin);
   // Throttle::udcmax = Param::GetFloat(Param::udclim);
   Throttle::speedLimit = Param::GetInt(Param::revlim);
+  Throttle::speedkp = Param::GetFloat(Param::speedkp);
+  Throttle::speedflt = Param::GetInt(Param::speedflt);
+  Throttle::brkcruise = Param::GetFloat(Param::regenmax);
   Throttle::regenRamp = Param::GetFloat(Param::regenramp);
   Throttle::throttleRamp = Param::GetFloat(Param::throtramp);
   Throttle::throtmaxRev = Param::GetFloat(throtmaxRev);

@@ -30,7 +30,7 @@ public:
   static float NormalizeThrottle(int potval, int potIdx);
   static float CalcThrottle(int potval, int potIdx, bool brkpedal);
   static float CalcIdleSpeed(int speed);
-  static float CalcCruiseSpeed(int speed);
+  static float CalcCruiseSpeed(int speed, int rpmLimit);
   static bool TemperatureDerate(float tmp, float tmpMax, float &finalSpnt);
   static void UdcLimitCommand(float &finalSpnt, float udc);
   static void IdcLimitCommand(float &finalSpnt, float idc);

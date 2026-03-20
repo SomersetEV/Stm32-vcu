@@ -286,9 +286,9 @@ float Throttle::CalcIdleSpeed(int speed) {
   return MIN(idleThrotLim, speedkp * speederr);
 }
 
-float Throttle::CalcCruiseSpeed(int speed) {
+float Throttle::CalcCruiseSpeed(int speed, int rpmLimit) {
   speedFiltered = IIRFILTER(speedFiltered, speed, speedflt);
-  int speederr = cruiseSpeed - speedFiltered;
+  int speederr = rpmLimit - speedFiltered;
 
   float potnom = speedkp * speederr;
   potnom = MIN(100, potnom);
