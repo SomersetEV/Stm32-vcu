@@ -26,7 +26,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-// Next param id (increase when adding new parameter!): 157
+// Next param id (increase when adding new parameter!): 160
 /*              category     name         unit       min     max     default id
  */
 #define PARAM_LIST                                                             \
@@ -71,6 +71,9 @@
   PARAM_ENTRY(CAT_THROTTLE, throtramprpm, "rpm", 0, 20000, 20000, 14)          \
   PARAM_ENTRY(CAT_THROTTLE, revlim, "rpm", 0, 20000, 6000, 15)                 \
   PARAM_ENTRY(CAT_THROTTLE, revRegen, ONOFF, 0, 1, 0, 137)                     \
+  PARAM_ENTRY(CAT_GOVERNOR, govKp, "%/rpm", 0, 2, 0.3, 157)                    \
+  PARAM_ENTRY(CAT_GOVERNOR, govKi, "%/rpm/tick", 0, 0.5, 0.002, 158)           \
+  PARAM_ENTRY(CAT_GOVERNOR, govImax, "%", 0, 100, 100, 159)                    \
   PARAM_ENTRY(CAT_THROTTLE, udcmin, "V", 0, 1000, 450, 19)                     \
   PARAM_ENTRY(CAT_THROTTLE, udclim, "V", 0, 1000, 520, 20)                     \
   PARAM_ENTRY(CAT_THROTTLE, idcmax, "A", 0, 5000, 5000, 21)                    \
@@ -365,6 +368,7 @@
 #define CAT_HEATER "Heater Module"
 #define CAT_BMS "Battery Management"
 #define CAT_CRUISE "Cruise Control"
+#define CAT_GOVERNOR "Governor"
 #define CAT_LEXUS "Gearbox Control"
 #define CAT_CHARGER "Charger Control"
 #define CAT_DCDC "DC-DC Converter"

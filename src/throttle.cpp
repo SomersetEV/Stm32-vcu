@@ -49,6 +49,9 @@ float Throttle::udcmax;
 float Throttle::idcmin;
 float Throttle::idcmax;
 int Throttle::speedLimit;
+float Throttle::govKp;
+float Throttle::govKi;
+float Throttle::govImax;
 float Throttle::ThrotRpmFilt;
 bool Throttle::noregenreq = 0;
 float UDCres;
@@ -394,15 +397,37 @@ void Throttle::IdcLimitCommand(float &finalSpnt, float idc) {
 
 void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
   static int speedFiltered = 0;
+  static float govIntegral = 0;
 
   speedFiltered = IIRFILTER(speedFiltered, speed, 4);
 
-  if (finalSpnt > 0) {
-    int speederr = speedLimit - speedFiltered;
-    int res = speederr / 4;
+  int speederr = speedLimit - speedFiltered;
 
-    res = MAX(0, res);
-    finalSpnt = MIN(res, finalSpnt);
+  // Reset integral when well below the limit to prevent windup during
+  // starting and acceleration before the governor zone is reached
+  if (speederr > speedLimit / 2) {
+    govIntegral = 0;
+  } else {
+    govIntegral += (float)speederr * govKi;
+    govIntegral = MAX(-govImax, MIN(govImax, govIntegral));
+  }
+
+  float govOutput = (float)speederr * govKp + govIntegral;
+
+  if (speederr >= 0) {
+    // Below or at limit - governor limits positive throttle.
+    // The integral accumulates the steady-state load so RPM holds at setpoint
+    // without droop even under constant load.
+    if (finalSpnt > 0) {
+      govOutput = MAX(0.0f, govOutput);
+      finalSpnt = MIN(finalSpnt, govOutput);
+    }
+  } else {
+    // Over the limit - apply regen proportional to overspeed.
+    // Clamp to regenmax (which is a negative value, e.g. -10%)
+    govOutput = MIN(0.0f, govOutput);
+    govOutput = MAX(govOutput, regenmax);
+    finalSpnt = MIN(finalSpnt, govOutput);
   }
 }
 
