@@ -53,6 +53,8 @@ private:
   static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
   static float LV_Volts, LV_Amps;
   static uint16_t batteryVolts;
+  static uint8_t dcDcTimer;   // counts 100ms ticks in MOD_RUN before enabling DC-DC
+  static uint8_t dcDcCounter; // rolling 4-bit counter for 0x19C D7
 
   static void handle324(uint32_t data[2]);
   static void handle323(uint32_t data[2]);
