@@ -176,6 +176,9 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x7E;
     dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
+
+    bytes[0] = 0x00;
+    bytes[1] = (V2Ltimer > 50) ? 0x23 : 0x03; // 0x23 = V2L enable, 0x03 = ready
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
