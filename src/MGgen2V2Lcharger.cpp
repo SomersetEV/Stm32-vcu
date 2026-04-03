@@ -34,6 +34,8 @@ float MGgen2V2Lcharger::DCAmps;
 float MGgen2V2Lcharger::LV_Volts;
 float MGgen2V2Lcharger::LV_Amps;
 uint16_t MGgen2V2Lcharger::batteryVolts;
+uint8_t MGgen2V2Lcharger::dcDcTimer = 0;
+uint8_t MGgen2V2Lcharger::dcDcCounter = 0;
 static uint8_t PlugStat = 0;
 static bool PPStat = false;
 
@@ -158,19 +160,25 @@ void MGgen2V2Lcharger::Task100Ms() {
               8); // only need to send this to turn on V2L, but it doesn't hurt
                   // to send it every 100ms
 
+    // DC-DC enable is gated: real MG5 holds D3=0x06 for ~2.3s after power-on
+    // before flipping D3 to 0x26 to enable the DC-DC. Replicating that here
+    // prevents the charger getting confused on a run->off->run cycle.
+    if (dcDcTimer < 23)
+      dcDcTimer++;
     bytes[0] = 0x06;
     bytes[1] = 0xA0;
-    bytes[2] = 0x26; // 26 for on, 06 for off
-    bytes[3] = 0x00;
+    bytes[2] =
+        (dcDcTimer >= 23) ? 0x26 : 0x06; // 0x26 enables DC-DC, 0x06 holds off
+    bytes[3] = 0xA0;                     // real MG5 value (was 0x00)
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = 0x00;
-    bytes[7] = 0x7F;
+    bytes[6] = dcDcCounter & 0x0F; // rolling 4-bit counter (0x00-0x0F)
+    bytes[7] = 0x7E;
+    dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x00;
-    bytes[1] = 0x03; // 01 is stand by, 03 is driving, 06 is AC charging, 07 is
-                     // CCS charging
+    bytes[1] = (V2Ltimer > 50) ? 0x23 : 0x03; // 0x23 = V2L enable, 0x03 = ready
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
@@ -298,14 +306,21 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x394, (uint32_t *)bytes, 8);
 
+    // DC-DC enable is gated: real MG5 holds D3=0x06 for ~2.3s after power-on
+    // before flipping D3 to 0x26 to enable the DC-DC. Replicating that here
+    // prevents the charger getting confused on a run->off->run cycle.
+    if (dcDcTimer < 23)
+      dcDcTimer++;
     bytes[0] = 0x06;
     bytes[1] = 0xA0;
-    bytes[2] = 0x26; // 26 for on, 06 for off
-    bytes[3] = 0x00;
+    bytes[2] =
+        (dcDcTimer >= 23) ? 0x26 : 0x06; // 0x26 enables DC-DC, 0x06 holds off
+    bytes[3] = 0xA0;                     // real MG5 value (was 0x00)
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = 0x00;
-    bytes[7] = 0x7F;
+    bytes[6] = dcDcCounter & 0x0F; // rolling 4-bit counter (0x00-0x0F)
+    bytes[7] = 0x7E;
+    dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
   }
   if (clearToStart) {
@@ -317,8 +332,6 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[5] = 0xDC;
     bytes[6] = (voltage_encoded >> 8) & 0xFF;
     bytes[7] = voltage_encoded & 0xFF;
-    // bytes[6] = voltagesetpoint;
-    // bytes[7] = 0x00;
     can->Send(0x29C, (uint32_t *)bytes, 8);
 
   } else {
@@ -336,16 +349,18 @@ void MGgen2V2Lcharger::Task100Ms() {
 
 void MGgen2V2Lcharger::Off() {
 
-  V2Ltimer = 0; // reset V2L timer
+  V2Ltimer = 0;  // reset V2L timer
+  dcDcTimer = 0; // reset DC-DC startup gate — forces re-sequencing on next RUN
+  dcDcCounter = 0; // reset rolling counter
   uint8_t bytes[8];
-  bytes[0] = 0x26;
+  bytes[0] = 0x46; // TRUE off state
   bytes[1] = 0xA0;
-  bytes[2] = 0x06; // 26 for on, 06 for off
+  bytes[2] = 0x06; // DC-DC off
   bytes[3] = 0x00;
   bytes[4] = 0x00;
   bytes[5] = 0x00;
   bytes[6] = 0x00;
-  bytes[7] = 0x7F;
+  bytes[7] = 0x00; // real MG5 sends 0x00 here during true off (was 0x7F)
   can->Send(0x19C, (uint32_t *)bytes, 8);
 
   bytes[0] = 0x00;
