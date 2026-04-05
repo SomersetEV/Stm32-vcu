@@ -178,8 +178,10 @@ void MGgen2V2Lcharger::Task100Ms() {
     can->Send(0x19C, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x00;
-    bytes[1] = (V2Ltimer > 50) ? 0x23 : 0x03; // 0x23 = V2L enable, 0x03 = ready
-    bytes[2] = 0x00;
+    bytes[1] = (V2Ltimer > 50)
+                   ? 0x21
+                   : 0x01; // 0x21 = V2L enable (0x20|0x01), 0x01 = standby
+    bytes[2] = 0xE0; // data valid flag — must be 0xE0 for OBC to accept message
     bytes[3] = 0x00;
     bytes[4] = 0x00;
     bytes[5] = 0x00;
