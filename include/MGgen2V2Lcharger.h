@@ -50,6 +50,7 @@ private:
   float V2Ltimer = 0;
   bool clearToStart = false, shutDownReq = false, pwmON = false;
   static uint8_t chgStatus, evseDuty;
+  static uint8_t dcDcTimer, dcDcCounter;
   static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
   static float LV_Volts, LV_Amps;
   static uint16_t batteryVolts;
