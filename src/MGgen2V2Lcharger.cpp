@@ -36,6 +36,8 @@ float MGgen2V2Lcharger::LV_Amps;
 uint16_t MGgen2V2Lcharger::batteryVolts;
 uint8_t MGgen2V2Lcharger::dcDcTimer = 0;
 uint8_t MGgen2V2Lcharger::dcDcCounter = 0;
+uint8_t MGgen2V2Lcharger::v2lCounter = 0;    // rolling 4-bit counter for 0x08E
+uint8_t MGgen2V2Lcharger::v2lHeartbeat = 0;  // free-running counter for 0x099
 static uint8_t PlugStat = 0;
 static bool PPStat = false;
 
@@ -145,20 +147,36 @@ void MGgen2V2Lcharger::Task100Ms() {
   uint16_t voltage_encoded = static_cast<uint16_t>((setVolts + 0.5) * 50.0f);
 
   uint8_t bytes[8];
-  if (opmode == MOD_RUN) // do some DC-DC stuff
+  if (opmode == MOD_RUN) // V2L and DC-DC
   {
-    V2Ltimer = V2Ltimer + 1;
+    if (V2Ltimer < 200)
+      V2Ltimer++;
+
+    // --- FIX 1: 0x08E with rolling 4-bit counter and XOR checksum ---
+    // Charger validates D8 = D1^D2^D3^D4^D5^D6^D7. Static 0x00 was invalid.
     bytes[0] = 0x5D;
     bytes[1] = 0x05;
     bytes[2] = 0x04;
     bytes[3] = 0x00;
     bytes[4] = 0x13;
     bytes[5] = 0x88;
+    bytes[6] = v2lCounter & 0x0F;
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
+    v2lCounter++;
+    can->Send(0x08E, (uint32_t *)bytes, 8);
+
+    // --- FIX 2: 0x099 BMS heartbeat (was never sent) ---
+    // Real MG5 BMS sends this every 100ms. D1=0xA0, D6=0x5D signals V2L active.
+    // D2 is a free-running counter; D8 = XOR checksum of D1-D7.
+    bytes[0] = 0xA0;
+    bytes[1] = v2lHeartbeat++;
+    bytes[2] = 0x80;
+    bytes[3] = 0x04;
+    bytes[4] = 0x00;
+    bytes[5] = 0x5D;
     bytes[6] = 0x00;
-    bytes[7] = 0x00;
-    can->Send(0x08E, (uint32_t *)bytes,
-              8); // only need to send this to turn on V2L, but it doesn't hurt
-                  // to send it every 100ms
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
+    can->Send(0x099, (uint32_t *)bytes, 8);
 
     // DC-DC enable is gated: real MG5 holds D3=0x06 for ~2.3s after power-on
     // before flipping D3 to 0x26 to enable the DC-DC. Replicating that here
@@ -169,25 +187,27 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[1] = 0xA0;
     bytes[2] =
         (dcDcTimer >= 23) ? 0x26 : 0x06; // 0x26 enables DC-DC, 0x06 holds off
-    bytes[3] = 0xA0;                     // real MG5 value (was 0x00)
+    bytes[3] = 0xA0;
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = dcDcCounter & 0x0F; // rolling 4-bit counter (0x00-0x0F)
+    bytes[6] = dcDcCounter & 0x0F;
     bytes[7] = 0x7E;
     dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
 
+    // --- FIX 3: 0x297 BMS state — D2 stays 0x03 (driving/V2L) throughout ---
+    // Was incorrectly using 0x23 after timer > 50. Bench log shows 0x03 always.
     bytes[0] = 0x00;
-    bytes[1] = (V2Ltimer > 50) ? 0x23 : 0x03; // 0x23 = V2L enable, 0x03 = ready
+    bytes[1] = 0x03; // 0x03 = driving/V2L mode
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = 0x20; // 20 to wake up charger.
+    bytes[6] = 0x20;
     bytes[7] = 0x00;
-    can->Send(0x297, (uint32_t *)bytes, 8); // 297 is BMS state
+    can->Send(0x297, (uint32_t *)bytes, 8);
 
-    bytes[0] = 0x0E; // 0E to wake up
+    bytes[0] = 0x0E;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
     bytes[3] = 0x00;
@@ -197,40 +217,70 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x1F1, (uint32_t *)bytes, 8);
 
-    if (V2Ltimer > 25 && V2Ltimer < 50) {
-      bytes[0] = 0x00;
-      bytes[1] = 0x00;
-      bytes[2] = 0x00;
-      bytes[3] = 0x00;
-      bytes[4] = 0x28;
-      bytes[5] = 0x00;
-      bytes[6] = 0x00;
-      bytes[7] = 0x46;                        // 48 to not V2L
-      can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
-    } else if (V2Ltimer > 50) {
-      V2Ltimer = 51;
-      bytes[0] = 0x00;
-      bytes[1] = 0x00;
-      bytes[2] = 0x00;
-      bytes[3] = 0x00;
-      bytes[4] = 0x28;
-      bytes[5] = 0x00;
-      bytes[6] = 0x00;
-      bytes[7] = 0x48;                        // 48 to start V2L
-      can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
-      /*} else if (V2Ltimer > 60) {
+    // --- FIX 4: 0x33F state machine with timings matched to real MG5 ---
+    // Phase 0 (0-2):   D8=0x00 idle (~300ms)
+    // Phase 1 (3-54):  D8=0x46 V2L announce (~5s, matches real car)
+    // Phase 2 (55+):   D8=0x48 V2L power output ON (~5.5s total)
+    // Pre-activate flags (0x322, 0x29B, 0x29C) flip at timer 50,
+    // giving ~500ms of settling before 0x48 at timer 55.
+    bytes[0] = 0x00;
+    bytes[1] = 0x00;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x28;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    if (V2Ltimer < 3)
+      bytes[7] = 0x00;       // idle — let charger settle
+    else if (V2Ltimer < 55)
+      bytes[7] = 0x46;       // announce V2L (~300ms, matches real MG5)
+    else
+      bytes[7] = 0x48;       // V2L output enable (~5.5s total, matches real MG5)
+    can->Send(0x33F, (uint32_t *)bytes, 8);
 
-        bytes[0] = 0x00;
-        bytes[1] = 0x00;
-        bytes[2] = 0x00;
-        bytes[3] = 0x00;
-        bytes[4] = 0x28;
-        bytes[5] = 0x00;
-        bytes[6] = 0x00;
-        bytes[7] = 0x46;                        // 48 to not V2L
-        can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
-      }*/
+    // 0x322 mode flag: D4 must be 0x20 before V2L output is enabled
+    // Set at timer 50 so flags are stable for ~500ms before 0x48 at timer 55
+    bytes[0] = 0x00;
+    bytes[1] = 0x00;
+    bytes[2] = 0x00;
+    bytes[3] = (V2Ltimer >= 50) ? 0x20 : 0x00;
+    bytes[4] = 0x00;
+    bytes[5] = 0x00;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x322, (uint32_t *)bytes, 8);
+
+    // 0x29B: D4=0x02 while waiting, drops to 0x00 when V2L output is ready
+    bytes[0] = 0x3B;
+    bytes[1] = 0xCA;
+    bytes[2] = 0x86;
+    bytes[3] = (V2Ltimer >= 50) ? 0x00 : 0x02;
+    bytes[4] = 0xFD;
+    bytes[5] = 0x06;
+    bytes[6] = 0x00;
+    bytes[7] = 0x00;
+    can->Send(0x29B, (uint32_t *)bytes, 8);
+
+    // 0x29C: intermediate until ready, then report battery voltage
+    bytes[0] = 0x28;
+    if (V2Ltimer >= 50) {
+      bytes[1] = 0x89;
+      bytes[2] = 0x04;
+      bytes[3] = 0x00;
+      bytes[4] = 0x00;
+      bytes[5] = 0xDC;
+      bytes[6] = (voltage_encoded >> 8) & 0xFF;
+      bytes[7] = voltage_encoded & 0xFF;
+    } else {
+      bytes[1] = 0x00;
+      bytes[2] = 0x00;
+      bytes[3] = 0x00;
+      bytes[4] = 0x00;
+      bytes[5] = 0x00;
+      bytes[6] = 0x00;
+      bytes[7] = 0x00;
     }
+    can->Send(0x29C, (uint32_t *)bytes, 8);
   }
 
   if (opmode == MOD_CHARGE) {
@@ -352,6 +402,8 @@ void MGgen2V2Lcharger::Off() {
   V2Ltimer = 0;  // reset V2L timer
   dcDcTimer = 0; // reset DC-DC startup gate — forces re-sequencing on next RUN
   dcDcCounter = 0; // reset rolling counter
+  v2lCounter = 0;    // reset 0x08E counter
+  v2lHeartbeat = 0;  // reset 0x099 counter
   uint8_t bytes[8];
   bytes[0] = 0x46; // TRUE off state
   bytes[1] = 0xA0;
