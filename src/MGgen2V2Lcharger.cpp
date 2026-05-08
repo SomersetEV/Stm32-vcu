@@ -197,6 +197,7 @@ void MGgen2V2Lcharger::Task100Ms() {
 
     // --- FIX 3: 0x297 BMS state — D2 stays 0x03 (driving/V2L) throughout ---
     // Was incorrectly using 0x23 after timer > 50. Bench log shows 0x03 always.
+    // D8 = XOR(D1..D7) — vehicle log confirmed D8=0x00 was wrong (should be 0x23).
     bytes[0] = 0x00;
     bytes[1] = 0x03; // 0x03 = driving/V2L mode
     bytes[2] = 0x00;
@@ -204,7 +205,7 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[4] = 0x00;
     bytes[5] = 0x00;
     bytes[6] = 0x20;
-    bytes[7] = 0x00;
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6]; // 0x23
     can->Send(0x297, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x0E;
@@ -373,27 +374,32 @@ void MGgen2V2Lcharger::Task100Ms() {
     dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
   }
-  if (clearToStart) {
-    bytes[0] = 0x28;
-    bytes[1] = 0x89;
-    bytes[2] = 0x07;
-    bytes[3] = 0xFE;
-    bytes[4] = 0x00;
-    bytes[5] = 0xDC;
-    bytes[6] = (voltage_encoded >> 8) & 0xFF;
-    bytes[7] = voltage_encoded & 0xFF;
-    can->Send(0x29C, (uint32_t *)bytes, 8);
+  // 0x29C is handled inside MOD_RUN with the correct V2L sequencing.
+  // Only send the charge/idle value when NOT in RUN mode to avoid
+  // fighting the V2L 0x29C send and confusing the charger.
+  if (opmode != MOD_RUN) {
+    if (clearToStart) {
+      bytes[0] = 0x28;
+      bytes[1] = 0x89;
+      bytes[2] = 0x07;
+      bytes[3] = 0xFE;
+      bytes[4] = 0x00;
+      bytes[5] = 0xDC;
+      bytes[6] = (voltage_encoded >> 8) & 0xFF;
+      bytes[7] = voltage_encoded & 0xFF;
+      can->Send(0x29C, (uint32_t *)bytes, 8);
 
-  } else {
-    bytes[0] = 0x00;
-    bytes[1] = 0x00;
-    bytes[2] = 0x00;
-    bytes[3] = 0x00;
-    bytes[4] = 0x00;
-    bytes[5] = 0x00;
-    bytes[6] = 0x00;
-    bytes[7] = 0x12;
-    can->Send(0x29C, (uint32_t *)bytes, 8);
+    } else {
+      bytes[0] = 0x00;
+      bytes[1] = 0x00;
+      bytes[2] = 0x00;
+      bytes[3] = 0x00;
+      bytes[4] = 0x00;
+      bytes[5] = 0x00;
+      bytes[6] = 0x00;
+      bytes[7] = 0x12;
+      can->Send(0x29C, (uint32_t *)bytes, 8);
+    }
   }
 }
 
