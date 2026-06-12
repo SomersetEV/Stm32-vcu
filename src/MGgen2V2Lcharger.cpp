@@ -152,54 +152,25 @@ void MGgen2V2Lcharger::Task100Ms() {
     if (V2Ltimer < 200)
       V2Ltimer++;
 
-    // --- FIX 1: 0x08E with rolling 4-bit counter and XOR checksum ---
-    // Charger validates D8 = D1^D2^D3^D4^D5^D6^D7. Static 0x00 was invalid.
-    bytes[0] = 0x5D;
-    bytes[1] = 0x05;
-    bytes[2] = 0x04;
-    bytes[3] = 0x00;
-    bytes[4] = 0x13;
-    bytes[5] = 0x88;
-    bytes[6] = v2lCounter & 0x0F;
-    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
-    v2lCounter++;
-    can->Send(0x08E, (uint32_t *)bytes, 8);
-
-    // --- FIX 2: 0x099 BMS heartbeat (was never sent) ---
-    // Real MG5 BMS sends this every 100ms. D1=0xA0, D6=0x5D signals V2L active.
-    // D2 is a free-running counter; D8 = XOR checksum of D1-D7.
-    bytes[0] = 0xA0;
-    bytes[1] = v2lHeartbeat++;
-    bytes[2] = 0x80;
-    bytes[3] = 0x04;
-    bytes[4] = 0x00;
-    bytes[5] = 0x5D;
-    bytes[6] = 0x00;
-    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
-    can->Send(0x099, (uint32_t *)bytes, 8);
-
-    // DC-DC enable is gated: real MG5 holds D3=0x06 for ~2.3s after power-on
-    // before flipping D3 to 0x26 to enable the DC-DC. Replicating that here
-    // prevents the charger getting confused on a run->off->run cycle.
+    // --- 0x19C: DC-DC keepalive ---
+    // D5=0x7F, D6=0xFF, D8=0x7F confirmed from working V2L log.
     if (dcDcTimer < 23)
       dcDcTimer++;
     bytes[0] = 0x06;
     bytes[1] = 0xA0;
-    bytes[2] =
-        (dcDcTimer >= 23) ? 0x26 : 0x06; // 0x26 enables DC-DC, 0x06 holds off
+    bytes[2] = (dcDcTimer >= 23) ? 0x26 : 0x06; // 0x26 enables DC-DC, 0x06 holds off
     bytes[3] = 0xA0;
-    bytes[4] = 0x00;
-    bytes[5] = 0x00;
+    bytes[4] = 0x7F;
+    bytes[5] = 0xFF;
     bytes[6] = dcDcCounter & 0x0F;
-    bytes[7] = 0x7E;
+    bytes[7] = 0x7F;
     dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
 
-    // --- FIX 3: 0x297 BMS state — D2 stays 0x03 (driving/V2L) throughout ---
-    // Was incorrectly using 0x23 after timer > 50. Bench log shows 0x03 always.
-    // D8 = XOR(D1..D7) — vehicle log confirmed D8=0x00 was wrong (should be 0x23).
+    // --- 0x297: BMS state — two versions required by charger ---
+    // Simple version (HCU/VCU side). D2=0x03 = driving/V2L mode throughout.
     bytes[0] = 0x00;
-    bytes[1] = 0x03; // 0x03 = driving/V2L mode
+    bytes[1] = 0x03;
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
@@ -208,6 +179,20 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6]; // 0x23
     can->Send(0x297, (uint32_t *)bytes, 8);
 
+    // Full BMS version (bus-3 style) — working V2L log shows the charger
+    // requires this second format to enable V2L output.
+    // D1=0x01, D3=0xE0, D5=0xC3; D7 free-running counter; D8 = XOR(D1..D7).
+    bytes[0] = 0x01;
+    bytes[1] = 0x03;
+    bytes[2] = 0xE0;
+    bytes[3] = 0x00;
+    bytes[4] = 0xC3;
+    bytes[5] = 0x0C;
+    bytes[6] = v2lHeartbeat++;
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
+    can->Send(0x297, (uint32_t *)bytes, 8);
+
+    // --- 0x1F1: wakeup keepalive ---
     bytes[0] = 0x0E;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
@@ -218,12 +203,12 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x1F1, (uint32_t *)bytes, 8);
 
-    // --- FIX 4: 0x33F state machine with timings matched to real MG5 ---
-    // Phase 0 (0-2):   D8=0x00 idle (~300ms)
-    // Phase 1 (3-54):  D8=0x46 V2L announce (~5s, matches real car)
-    // Phase 2 (55+):   D8=0x48 V2L power output ON (~5.5s total)
-    // Pre-activate flags (0x322, 0x29B, 0x29C) flip at timer 50,
-    // giving ~500ms of settling before 0x48 at timer 55.
+    // --- 0x33F: V2L state machine ---
+    // Phase 0 (0-2):  D8=0x00 idle
+    // Phase 1 (3-16): D8=0x46 V2L announce (300ms)
+    // Phase 2 (17+):  D8=0x48 V2L output enable
+    // 1.4s gap between 0x46 and 0x48 matches both working reference logs
+    // exactly (bench playback and minimal 3-message log).
     bytes[0] = 0x00;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
@@ -232,56 +217,26 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[5] = 0x00;
     bytes[6] = 0x00;
     if (V2Ltimer < 3)
-      bytes[7] = 0x00;       // idle — let charger settle
-    else if (V2Ltimer < 55)
-      bytes[7] = 0x46;       // announce V2L (~300ms, matches real MG5)
+      bytes[7] = 0x00;
+    else if (V2Ltimer < 17)
+      bytes[7] = 0x46;
     else
-      bytes[7] = 0x48;       // V2L output enable (~5.5s total, matches real MG5)
+      bytes[7] = 0x48;
     can->Send(0x33F, (uint32_t *)bytes, 8);
 
-    // 0x322 mode flag: D4 must be 0x20 before V2L output is enabled
-    // Set at timer 50 so flags are stable for ~500ms before 0x48 at timer 55
-    bytes[0] = 0x00;
-    bytes[1] = 0x00;
-    bytes[2] = 0x00;
-    bytes[3] = (V2Ltimer >= 50) ? 0x20 : 0x00;
-    bytes[4] = 0x00;
-    bytes[5] = 0x00;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
-    can->Send(0x322, (uint32_t *)bytes, 8);
-
-    // 0x29B: D4=0x02 while waiting, drops to 0x00 when V2L output is ready
-    bytes[0] = 0x3B;
-    bytes[1] = 0xCA;
-    bytes[2] = 0x86;
-    bytes[3] = (V2Ltimer >= 50) ? 0x00 : 0x02;
-    bytes[4] = 0xFD;
-    bytes[5] = 0x06;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
-    can->Send(0x29B, (uint32_t *)bytes, 8);
-
-    // 0x29C: intermediate until ready, then report battery voltage
-    bytes[0] = 0x28;
-    if (V2Ltimer >= 50) {
-      bytes[1] = 0x89;
-      bytes[2] = 0x04;
-      bytes[3] = 0x00;
-      bytes[4] = 0x00;
-      bytes[5] = 0xDC;
-      bytes[6] = (voltage_encoded >> 8) & 0xFF;
-      bytes[7] = voltage_encoded & 0xFF;
-    } else {
-      bytes[1] = 0x00;
-      bytes[2] = 0x00;
-      bytes[3] = 0x00;
-      bytes[4] = 0x00;
-      bytes[5] = 0x00;
-      bytes[6] = 0x00;
-      bytes[7] = 0x00;
-    }
-    can->Send(0x29C, (uint32_t *)bytes, 8);
+    // --- 0x396: Car_2_CCU — direct car/HCU to charger authorisation ---
+    // DBC confirms this is a Car_2_CCU message (car sends to charger, not BMS).
+    // D5=0xC0 is the V2L-active value seen in the real MG5 hybrid log.
+    // May only need to be received once to configure/authorise V2L in charger.
+    bytes[0] = 0x44;
+    bytes[1] = 0x6E;
+    bytes[2] = 0xB4;
+    bytes[3] = 0x28;
+    bytes[4] = 0xC0;
+    bytes[5] = 0x4E;
+    bytes[6] = 0x4D;
+    bytes[7] = 0x4D;
+    can->Send(0x396, (uint32_t *)bytes, 8);
   }
 
   if (opmode == MOD_CHARGE) {
@@ -323,8 +278,8 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[3] = 0x00;
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
+    bytes[6] = dcDcCounter & 0x0F;
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
     can->Send(0x39B, (uint32_t *)bytes, 8);
 
     bytes[0] = 0x00;
@@ -353,8 +308,8 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[3] = 0x00;
     bytes[4] = 0x10;
     bytes[5] = 0x43;
-    bytes[6] = 0x00;
-    bytes[7] = 0x00;
+    bytes[6] = dcDcCounter & 0x0F;
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
     can->Send(0x394, (uint32_t *)bytes, 8);
 
     // DC-DC enable is gated: real MG5 holds D3=0x06 for ~2.3s after power-on
@@ -458,7 +413,7 @@ void MGgen2V2Lcharger::Off() {
   bytes[4] = 0x28;
   bytes[5] = 0x00;
   bytes[6] = 0x00;
-  bytes[7] = 0x46;                        //
+  bytes[7] = 0x00;                        // idle — was incorrectly 0x46 (V2L announce)
   can->Send(0x33F, (uint32_t *)bytes, 8); // V2L
 
   bytes[0] = 0x00;
