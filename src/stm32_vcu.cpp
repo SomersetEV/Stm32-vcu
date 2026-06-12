@@ -1296,6 +1296,7 @@ void Param::Change(Param::PARAM_NUM paramNum) {
   Throttle::speedLimit = Param::GetInt(Param::revlim);
   Throttle::govKp = Param::GetFloat(Param::govKp);
   Throttle::govKi = Param::GetFloat(Param::govKi);
+  Throttle::govKd = Param::GetFloat(Param::govKd);
   Throttle::govImax = Param::GetFloat(Param::govImax);
   Throttle::regenRamp = Param::GetFloat(Param::regenramp);
   Throttle::throttleRamp = Param::GetFloat(Param::throtramp);

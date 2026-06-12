@@ -51,6 +51,7 @@ float Throttle::idcmax;
 int Throttle::speedLimit;
 float Throttle::govKp;
 float Throttle::govKi;
+float Throttle::govKd;
 float Throttle::govImax;
 float Throttle::ThrotRpmFilt;
 bool Throttle::noregenreq = 0;
@@ -397,22 +398,38 @@ void Throttle::IdcLimitCommand(float &finalSpnt, float idc) {
 
 void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
   static int speedFiltered = 0;
+  static int lastSpeedFiltered = 0;
   static float govIntegral = 0;
+  static float speedSlope = 0;
 
   speedFiltered = IIRFILTER(speedFiltered, speed, 4);
 
   int speederr = speedLimit - speedFiltered;
 
+  // Damping acts on measured speed rather than error, so it opposes RPM
+  // movement in both directions. This suppresses hunting at light load,
+  // allowing Kp/Ki stiff enough to hold the limit under heavy load.
+  speedSlope =
+      IIRFILTERF(speedSlope, (float)(speedFiltered - lastSpeedFiltered), 3);
+  lastSpeedFiltered = speedFiltered;
+
+  float govProp = (float)speederr * govKp - speedSlope * govKd;
+
   // Reset integral when well below the limit to prevent windup during
   // starting and acceleration before the governor zone is reached
   if (speederr > speedLimit / 2) {
     govIntegral = 0;
-  } else {
+  } else if (speederr < 0 || govProp + govIntegral < finalSpnt) {
+    // Only integrate while over the limit or while the governor is the
+    // binding constraint. Winding up while the driver's pedal is the limit
+    // would have to unwind through an overspeed, making the apparent gain
+    // requirement load-dependent. Freezing instead also keeps the
+    // load-carrying integral through brief pedal lifts.
     govIntegral += (float)speederr * govKi;
     govIntegral = MAX(-govImax, MIN(govImax, govIntegral));
   }
 
-  float govOutput = (float)speederr * govKp + govIntegral;
+  float govOutput = govProp + govIntegral;
 
   if (speederr >= 0) {
     // Below or at limit - governor limits positive throttle.

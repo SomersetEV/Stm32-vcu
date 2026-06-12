@@ -65,6 +65,7 @@ public:
   static int speedLimit;
   static float govKp;
   static float govKi;
+  static float govKd;
   static float govImax;
   static float regenendRpm;
   static float ThrotRpmFilt;
