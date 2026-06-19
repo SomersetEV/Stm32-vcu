@@ -1294,8 +1294,12 @@ void Param::Change(Param::PARAM_NUM paramNum) {
   // Throttle::udcmin = Param::GetFloat(Param::udcmin);
   // Throttle::udcmax = Param::GetFloat(Param::udclim);
   Throttle::speedLimit = Param::GetInt(Param::revlim);
-  Throttle::govKp = Param::GetFloat(Param::govKp);
-  Throttle::govKi = Param::GetFloat(Param::govKi);
+  // govKp/govKi are entered pre-scaled so they survive the 1/32 fixed-point
+  // parameter resolution. The param value is in units of its stated fraction:
+  // govKp in 0.01 %/rpm (entered 30 -> 0.30), govKi in 0.001 %/rpm/tick
+  // (entered 2 -> 0.002). Without this the tiny raw Ki rounded to zero.
+  Throttle::govKp = Param::GetFloat(Param::govKp) * 0.01f;
+  Throttle::govKi = Param::GetFloat(Param::govKi) * 0.001f;
   Throttle::govKd = Param::GetFloat(Param::govKd);
   Throttle::govImax = Param::GetFloat(Param::govImax);
   Throttle::regenRamp = Param::GetFloat(Param::regenramp);

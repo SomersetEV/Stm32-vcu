@@ -71,8 +71,8 @@
   PARAM_ENTRY(CAT_THROTTLE, throtramprpm, "rpm", 0, 20000, 20000, 14)          \
   PARAM_ENTRY(CAT_THROTTLE, revlim, "rpm", 0, 20000, 6000, 15)                 \
   PARAM_ENTRY(CAT_THROTTLE, revRegen, ONOFF, 0, 1, 0, 137)                     \
-  PARAM_ENTRY(CAT_GOVERNOR, govKp, "%/rpm", 0, 2, 0.3, 157)                    \
-  PARAM_ENTRY(CAT_GOVERNOR, govKi, "%/rpm/tick", 0, 0.5, 0.002, 158)           \
+  PARAM_ENTRY(CAT_GOVERNOR, govKp, "0.01%/rpm", 0, 200, 30, 157)               \
+  PARAM_ENTRY(CAT_GOVERNOR, govKi, "0.001%/rpm/tk", 0, 500, 2, 158)            \
   PARAM_ENTRY(CAT_GOVERNOR, govKd, "%/(rpm/tick)", 0, 20, 0, 160)              \
   PARAM_ENTRY(CAT_GOVERNOR, govImax, "%", 0, 100, 100, 159)                    \
   PARAM_ENTRY(CAT_THROTTLE, udcmin, "V", 0, 1000, 450, 19)                     \
