@@ -126,6 +126,9 @@ void MGgen2V2Lcharger::DecodeCAN(int id, uint32_t data[2]) {
   case 0x323:
     MGgen2V2Lcharger::handle323(data);
     break;
+   case 0x33B:
+    MGgen2V2Lcharger::handle33B(data);
+    break;
     // case 0x38A:
     //    MGgen2V2Lcharger::handle38A(data);
     //    break;
@@ -535,6 +538,6 @@ void MGgen2V2Lcharger::handle33B(uint32_t data[2]) {
   uint8_t *bytes =
       (uint8_t *)data; // arrgghhh this converts the two 32bit array into
                        // bytes. See comments are useful:
-  temp_1 = bytes[3] - 50;
+  temp_1 = bytes[3] - 40;
   Param::SetInt(Param::ChgTemp, temp_1);
 }
