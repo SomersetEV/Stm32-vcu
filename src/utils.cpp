@@ -629,7 +629,20 @@ void CpSpoofOutput() {
   if (Param::GetInt(Param::interface) == ChargeInterfaces::i3LIM ||
       Param::GetInt(Param::interface) == ChargeInterfaces::CPC ||
       Param::GetInt(Param::interface) == ChargeInterfaces::Foccci) {
-    CpVal = float(Param::GetInt(Param::PilotLim) * 1.6667);
+    uint16_t PilotAmps = Param::GetInt(Param::PilotLim); // true cable limit (A)
+
+    // Optional manual power cap. CpMaxPwr == 0 disables the cap. When set, the
+    // CP duty is limited to whichever is lower: the true cable limit or the
+    // current equivalent of the configured power cap (amps = W / Vac).
+    uint16_t MaxPwr = Param::GetInt(Param::CpMaxPwr);
+    uint16_t Vac = Param::GetInt(Param::ChgAcVolt);
+    if (MaxPwr > 0 && Vac > 0) {
+      uint16_t CapAmps = MaxPwr / Vac;
+      if (CapAmps < PilotAmps)
+        PilotAmps = CapAmps;
+    }
+
+    CpVal = float(PilotAmps * 1.6667);
     Param::SetInt(Param::CP_PWM, CpVal);
     CpVal = (Param::GetInt(Param::CP_PWM) * 40);
   }
