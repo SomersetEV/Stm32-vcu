@@ -205,6 +205,8 @@
   VALUE_ENTRY(potbrake, "dig", 2021)                                           \
   VALUE_ENTRY(brakepressure, "dig", 2022)                                      \
   VALUE_ENTRY(potnom, "%", 2023)                                               \
+  VALUE_ENTRY(govOut, "%", 2124)                                               \
+  VALUE_ENTRY(govInt, "%", 2125)                                               \
   VALUE_ENTRY(dir, DIRS, 2024)                                                 \
   VALUE_ENTRY(tmphs, "°C", 2028)                                               \
   VALUE_ENTRY(tmpm, "°C", 2029)                                                \
@@ -280,7 +282,7 @@
   VALUE_ENTRY(DMA_ConsecFail, "", 2122)                                        \
   VALUE_ENTRY(HTM_State, "", 2123)
 
-// Next value Id: 2124
+// Next value Id: 2126
 
 // Dead params
 /*

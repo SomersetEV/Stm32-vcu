@@ -62,7 +62,6 @@ float IDCprevspnt = 0;
 
 // internal variable, reused every time the function is called
 static float throttleRamped = 0.0;
-static float SpeedFiltered = 0.0;
 
 static float regenlim = 0;
 
@@ -397,27 +396,35 @@ void Throttle::IdcLimitCommand(float &finalSpnt, float idc) {
 }
 
 void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
-  static int speedFiltered = 0;
-  static int lastSpeedFiltered = 0;
+  // govSpeedFiltered is local to the governor and intentionally named to NOT
+  // shadow Throttle::speedFiltered (used by CalcCruiseSpeed).
+  // Filtering is done in float: the previous integer filter quantised
+  // per-tick changes to 0 or 1 rpm, starving the derivative term of signal.
+  static float govSpeedFiltered = 0;
+  static float lastGovSpeedFiltered = 0;
   static float govIntegral = 0;
   static float speedSlope = 0;
 
-  speedFiltered = IIRFILTER(speedFiltered, speed, 4);
+  // Filter time constant reduced from ~160ms (integer IIRFILTER, shift 4,
+  // 1/16 per tick) to ~30ms (IIRFILTERF weight 2: out = (new + 2*old)/3).
+  // The old lag ate most of the derivative term's phase lead at the ~1Hz
+  // disturbance frequency of a baler plunger, leaving kd ineffective.
+  govSpeedFiltered = IIRFILTERF(govSpeedFiltered, (float)speed, 2);
 
-  int speederr = speedLimit - speedFiltered;
+  float speederr = (float)speedLimit - govSpeedFiltered;
 
   // Damping acts on measured speed rather than error, so it opposes RPM
   // movement in both directions. This suppresses hunting at light load,
   // allowing Kp/Ki stiff enough to hold the limit under heavy load.
   speedSlope =
-      IIRFILTERF(speedSlope, (float)(speedFiltered - lastSpeedFiltered), 3);
-  lastSpeedFiltered = speedFiltered;
+      IIRFILTERF(speedSlope, govSpeedFiltered - lastGovSpeedFiltered, 3);
+  lastGovSpeedFiltered = govSpeedFiltered;
 
-  float govProp = (float)speederr * govKp - speedSlope * govKd;
+  float govProp = speederr * govKp - speedSlope * govKd;
 
   // Reset integral when well below the limit to prevent windup during
   // starting and acceleration before the governor zone is reached
-  if (speederr > speedLimit / 2) {
+  if (speederr > (float)speedLimit / 2) {
     govIntegral = 0;
   } else if (speederr < 0 || govProp + govIntegral < finalSpnt) {
     // Only integrate while over the limit or while the governor is the
@@ -425,11 +432,16 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
     // would have to unwind through an overspeed, making the apparent gain
     // requirement load-dependent. Freezing instead also keeps the
     // load-carrying integral through brief pedal lifts.
-    govIntegral += (float)speederr * govKi;
+    govIntegral += speederr * govKi;
     govIntegral = MAX(-govImax, MIN(govImax, govIntegral));
   }
 
   float govOutput = govProp + govIntegral;
+
+  // Spot values for tuning: governor output vs integral state. Comparing
+  // govOut against potnom shows when the governor is the binding constraint.
+  Param::SetFloat(Param::govOut, govOutput);
+  Param::SetFloat(Param::govInt, govIntegral);
 
   if (speederr >= 0) {
     // Below or at limit - governor limits positive throttle.
