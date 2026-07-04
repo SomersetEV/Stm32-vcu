@@ -409,7 +409,7 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
   // 1/16 per tick) to ~30ms (IIRFILTERF weight 2: out = (new + 2*old)/3).
   // The old lag ate most of the derivative term's phase lead at the ~1Hz
   // disturbance frequency of a baler plunger, leaving kd ineffective.
-  govSpeedFiltered = IIRFILTERF(govSpeedFiltered, (float)speed, 2);
+  govSpeedFiltered = IIRFILTERF(govSpeedFiltered, (float)speed, 4);
 
   float speederr = (float)speedLimit - govSpeedFiltered;
 
@@ -417,7 +417,7 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
   // movement in both directions. This suppresses hunting at light load,
   // allowing Kp/Ki stiff enough to hold the limit under heavy load.
   speedSlope =
-      IIRFILTERF(speedSlope, govSpeedFiltered - lastGovSpeedFiltered, 3);
+      IIRFILTERF(speedSlope, govSpeedFiltered - lastGovSpeedFiltered, 4);
   lastGovSpeedFiltered = govSpeedFiltered;
 
   float govProp = speederr * govKp - speedSlope * govKd;
