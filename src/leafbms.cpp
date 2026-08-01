@@ -143,7 +143,7 @@ void LeafBMS::DecodeCAN(int id, uint8_t *data) {
     */
     // 0x5BC only contains average battery temperature on ZE0
     if (LEAF_battery_Type == ZE0_BATTERY) {
-      temperature = (bytes[3] - 40);
+      temperature = (bytes[3] - 80);
       Param::SetInt(Param::BMS_Tavg, temperature);
     }
     break;
@@ -154,7 +154,7 @@ void LeafBMS::DecodeCAN(int id, uint8_t *data) {
     if (LEAF_battery_Type == AZE0_BATTERY) {
       if ((bytes[0] >> 6) == 1) { // Mux signalling MAX value
         temperature =
-            ((bytes[2] / 2) - 40); // Effectively has only 7-bit precision,
+            ((bytes[2] / 2) - 80); // Effectively has only 7-bit precision,
                                    // bottom bit is always 0
         Param::SetInt(Param::BMS_Tavg, temperature);
       }
