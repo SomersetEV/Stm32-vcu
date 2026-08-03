@@ -140,7 +140,6 @@ void SimpBMS::Task100Ms() {
     Param::SetFloat(Param::idcmax, MIN(chargeCurrentLimit, 5000.0));
     Param::SetFloat(Param::idcmin, MAX(-dischargeCurrentLimit, -5000.0));
   }
-}
 else {
   Param::SetFloat(Param::BMS_Vmin, 0);
   Param::SetFloat(Param::BMS_Vmax, 0);
