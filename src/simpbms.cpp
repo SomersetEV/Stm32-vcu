@@ -29,83 +29,84 @@
  * working correctly.
  */
 
-void SimpBMS::SetCanInterface(CanHardware* c)
-{
-   can = c;
-   can->RegisterUserMessage(0x373);
-   can->RegisterUserMessage(0x351);
-   can->RegisterUserMessage(0x356);
-   can->RegisterUserMessage(0x355);
+void SimpBMS::SetCanInterface(CanHardware *c) {
+  can = c;
+  can->RegisterUserMessage(0x373);
+  can->RegisterUserMessage(0x351);
+  can->RegisterUserMessage(0x356);
+  can->RegisterUserMessage(0x355);
 }
 
 bool SimpBMS::BMSDataValid() {
-   // Return false if primary BMS is not sending data.
-   if(timeoutCounter < 1) return false;
-   return true;
+  // Return false if primary BMS is not sending data.
+  if (timeoutCounter < 1)
+    return false;
+  return true;
 }
 
 // Return whether charging is currently permitted.
-bool SimpBMS::ChargeAllowed()
-{
-   // Refuse to charge if the BMS is not sending data.
-   if(!BMSDataValid()) return false;
+bool SimpBMS::ChargeAllowed() {
+  // Refuse to charge if the BMS is not sending data.
+  if (!BMSDataValid())
+    return false;
 
-   // Refuse to charge if the voltage or temperature is out of range.
-   if(maxCellV > Param::GetFloat(Param::BMS_VmaxLimit)) return false;
-   if(minCellV < Param::GetFloat(Param::BMS_VminLimit)) return false;
-   if(maxTempC > Param::GetFloat(Param::BMS_TmaxLimit)) return false;
-   if(minTempC < Param::GetFloat(Param::BMS_TminLimit)) return false;
+  // Refuse to charge if the voltage or temperature is out of range.
+  if (maxCellV > Param::GetFloat(Param::BMS_VmaxLimit))
+    return false;
+  if (minCellV < Param::GetFloat(Param::BMS_VminLimit))
+    return false;
+  if (maxTempC > Param::GetFloat(Param::BMS_TmaxLimit))
+    return false;
+  if (minTempC < Param::GetFloat(Param::BMS_TminLimit))
+    return false;
 
-   // Refuse to charge if the current limit is zero.
-   if(chargeCurrentLimit < 0.5) return false;
+  // Refuse to charge if the current limit is zero.
+  if (chargeCurrentLimit < 0.5)
+    return false;
 
-   // Otherwise, charging is permitted.
-   return true;
+  // Otherwise, charging is permitted.
+  return true;
 }
 
 // Return the maximum charge current allowed by the BMS.
-float SimpBMS::MaxChargeCurrent()
-{
-   if(!ChargeAllowed()) return 0;
-   return chargeCurrentLimit * 0.1;
+float SimpBMS::MaxChargeCurrent() {
+  if (!ChargeAllowed())
+    return 0;
+  return chargeCurrentLimit * 0.1;
 }
 
 // Return the maximum discharge current allowed by the BMS.
-float SimpBMS::MaxDischargeCurrent()
-{
-   // Not gated on ChargeAllowed() - that gate is charge specific and the BMS
-   // already applies its own derates to the discharge limit before sending it.
-   // Zero simply means "no data" here, the caller then leaves the configured
-   // limits alone rather than cutting drive power.
-   if(!BMSDataValid()) return 0;
-   return dischargeCurrentLimit * 0.1;
+float SimpBMS::MaxDischargeCurrent() {
+  // Not gated on ChargeAllowed() - that gate is charge specific and the BMS
+  // already applies its own derates to the discharge limit before sending it.
+  // Zero simply means "no data" here, the caller then leaves the configured
+  // limits alone rather than cutting drive power.
+  if (!BMSDataValid())
+    return 0;
+  return dischargeCurrentLimit * 0.1;
 }
 
 // Process voltage and temperature message from SimpBMS.
-void SimpBMS::DecodeCAN(int id, uint8_t *data)
-{
-   if (id == 0x373)
-   {
-      int minCell = data[0] | (data[1] << 8);
-      int maxCell = data[2] | (data[3] << 8);
-      int minTemp = data[4] | (data[5] << 8);
-      int maxTemp = data[6] | (data[7] << 8);
+void SimpBMS::DecodeCAN(int id, uint8_t *data) {
+  if (id == 0x373) {
+    int minCell = data[0] | (data[1] << 8);
+    int maxCell = data[2] | (data[3] << 8);
+    int minTemp = data[4] | (data[5] << 8);
+    int maxTemp = data[6] | (data[7] << 8);
 
-      minCellV = minCell / 1000.0;
-      maxCellV = maxCell / 1000.0;
-      minTempC = minTemp - 273;
-      maxTempC = maxTemp - 273;
+    minCellV = minCell / 1000.0;
+    maxCellV = maxCell / 1000.0;
+    minTempC = minTemp - 273;
+    maxTempC = maxTemp - 273;
 
-      // Reset timeout counter to the full timeout value
-      timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
-   }
-   else if (id == 0x351)
-   {
-      chargeCurrentLimit    = data[2] | (data[3] << 8);  // CCL, 0.1A per digit
-      dischargeCurrentLimit = data[4] | (data[5] << 8);  // DCL, 0.1A per digit
-   }
+    // Reset timeout counter to the full timeout value
+    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
+  } else if (id == 0x351) {
+    chargeCurrentLimit = data[2] | (data[3] << 8);    // CCL, 0.1A per digit
+    dischargeCurrentLimit = data[4] | (data[5] << 8); // DCL, 0.1A per digit
+  }
 
-    else if (id == 0x356) {
+  else if (id == 0x356) {
     batteryVoltage = (data[0] | (data[1] << 8)) * 0.1; // comes in 0.01V scale
 
     int16_t rawCurrent = (int16_t)(data[2] | (data[3] << 8));
@@ -114,51 +115,51 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data)
   } else if (id == 0x355) {
     stateOfCharge = data[0] | (data[1] << 8); // comes in 1% scale
   }
-
 }
 
 void SimpBMS::Task100Ms() {
-   // Decrement timeout counter.
-   if(timeoutCounter > 0) timeoutCounter--;
+  // Decrement timeout counter.
+  if (timeoutCounter > 0)
+    timeoutCounter--;
 
-   // Update informational parameters.
-   Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
-   Param::SetInt(Param::BMS_DischargeLim, MaxDischargeCurrent());
+  // Update informational parameters.
+  Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
+  Param::SetInt(Param::BMS_DischargeLim, MaxDischargeCurrent());
 
-   if(BMSDataValid()) {
-      Param::SetFloat(Param::BMS_Vmin, minCellV);
-      Param::SetFloat(Param::BMS_Vmax, maxCellV);
-      Param::SetFloat(Param::BMS_Tmin, minTempC);
-      Param::SetFloat(Param::BMS_Tmax, maxTempC);
+  if (BMSDataValid()) {
+    Param::SetFloat(Param::BMS_Vmin, minCellV);
+    Param::SetFloat(Param::BMS_Vmax, maxCellV);
+    Param::SetFloat(Param::BMS_Tmin, minTempC);
+    Param::SetFloat(Param::BMS_Tmax, maxTempC);
 
-      // Apply the BMS current limits to the drive current limits.
-      // idcmax is the positive (discharge) limit, idcmin the negative
-      // (regen, which charges the pack) limit. Only written while the BMS is
-      // actually talking - on a timeout we do nothing here and the user
-      // configured limits stay in force, so a CAN dropout cannot cut drive.
-      Param::SetFloat(Param::idcmax, MIN(dischargeCurrentLimit * 0.1, 5000.0));
-      Param::SetFloat(Param::idcmin, MAX(-(chargeCurrentLimit * 0.1), -5000.0));
-   }
-   else
-   {
-      Param::SetFloat(Param::BMS_Vmin, 0);
-      Param::SetFloat(Param::BMS_Vmax, 0);
-      Param::SetFloat(Param::BMS_Tmin, 0);
-      Param::SetFloat(Param::BMS_Tmax, 0);
-   }
-
-    if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
-  {
-   Param::SetFloat(Param::udc, batteryVoltage); 
-   Param::SetFloat(Param::udc2, batteryVoltage);
-   Param::SetFloat(Param::udcsw, batteryVoltage - 30);
+    // Apply the BMS current limits to the drive current limits.
+    // idcmax is the positive (discharge) limit, idcmin the negative
+    // (regen, which charges the pack) limit. Only written while the BMS is
+    // actually talking - on a timeout we do nothing here and the user
+    // configured limits stay in force, so a CAN dropout cannot cut drive.
+    Param::SetFloat(Param::idcmax, MIN(chargeCurrentLimit, 5000.0));
+    Param::SetFloat(Param::idcmin, MAX(-dischargeCurrentLimit, -5000.0));
   }
+}
+else {
+  Param::SetFloat(Param::BMS_Vmin, 0);
+  Param::SetFloat(Param::BMS_Vmax, 0);
+  Param::SetFloat(Param::BMS_Tmin, 0);
+  Param::SetFloat(Param::BMS_Tmax, 0);
+}
 
-    if (BMSDataValid()) {
-      Param::SetFloat(Param::idc, current);
-      Param::SetFloat(Param::SOC, stateOfCharge);
-    } else {
-      Param::SetFloat(Param::idc, 0);
-      Param::SetFloat(Param::udcsw, 1000);
-    }
+if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
+{
+  Param::SetFloat(Param::udc, batteryVoltage);
+  Param::SetFloat(Param::udc2, batteryVoltage);
+  Param::SetFloat(Param::udcsw, batteryVoltage - 30);
+}
+
+if (BMSDataValid()) {
+  Param::SetFloat(Param::idc, current);
+  Param::SetFloat(Param::SOC, stateOfCharge);
+} else {
+  Param::SetFloat(Param::idc, 0);
+  Param::SetFloat(Param::udcsw, 1000);
+}
 }
