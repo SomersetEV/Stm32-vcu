@@ -22,7 +22,8 @@
 
 #include "stm32_can.h"
 
-class Can_OBD2 {
+class Can_OBD2
+{
 public:
   void SetCanInterface(CanHardware *c);
   void DecodeCAN(int id, uint32_t data[2]);

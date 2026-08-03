@@ -22,16 +22,18 @@
 
 #include <heater.h>
 
-class AmperaHeater : public Heater {
-public:
-  /** Default constructor */
-  AmperaHeater();
-  void SetTargetTemperature(float temp) { (void)temp; } // Not supported (yet)?
-  void SetPower(uint16_t power, bool HeatReq);
 
-private:
-  bool isAwake = false;
-  void SendWakeup();
+class AmperaHeater : public Heater
+{
+   public:
+      /** Default constructor */
+      AmperaHeater();
+      void SetTargetTemperature(float temp) { (void)temp; } //Not supported (yet)?
+      void SetPower(uint16_t power, bool HeatReq);
+
+   private:
+      bool isAwake=false;
+      void SendWakeup();
 };
 
 #endif // AMPERAHEATER_H

@@ -5,10 +5,7 @@
 Project based on the OpenInverter System by Johannes Huebner to provide a universal VCU (Vehicle Control Unit) for electric vehicle conversion projects. 
 
 Please visit the development thread on the Openinverter Forum for more information : https://openinverter.org/forum/viewtopic.php?f=3&t=1277
-<img width="1723" height="960" alt="Zom_V1_3" src="https://github.com/user-attachments/assets/9656c54d-8c9a-453b-ab94-809dc201deae" />
-
-
-V1.3 Hardware now released. PDFs and Gerber here on Github, full Kicad 9 design is on Patreon at the 10Eur level.
+![Screenshot from 2025-01-28 14-17-28](https://github.com/user-attachments/assets/ff066c9e-8c79-470d-aa04-bc3b34198900)
 
 ## Videos on progress
 
@@ -21,8 +18,6 @@ V2.00a now available : https://vimeo.com/824494783?share=copy
 V2.15a now available : https://www.youtube.com/watch?v=iwB3wxCEFo0
 
 V2.20A now available : https://www.youtube.com/watch?v=wjlucUWX_lc
-
-V2.40A now available : https://vimeo.com/1201141543?fl=ip&fe=ec
 
 # Supported components
 
@@ -52,49 +47,9 @@ V2.40A now available : https://vimeo.com/1201141543?fl=ip&fe=ec
 - OBD2 Can support
 - TESLA Gen 2 DCDC Converter Can support
 
-
 # Contributing
 
 Information on how to contribute to this open source project can be found [Contributing Guide](./CONTRIBUTING.md)
 
-# Compiling
-You will need the arm-none-eabi toolchain: https://developer.arm.com/open-source/gnu-toolchain/gnu-rm/downloads
-On Linux this can be installed by typing:
-
-`sudo apt install gcc-arm-none-eabi`
-
-The only external depedencies are libopencm3 and libopeninv. You can download and build this dependency by typing
-
-`make get-deps`
-
-Now you can compile stm32-vcu by typing
-
-`make`
-
-# Tests
-
-Build the tests
-
-`make Tests`
-
-Run the tests
-
-`./test/test_vcu`
-
-And upload it to your board using a JTAG/SWD adapter, the updater.py script or the esp8266 web interface
-
-I use CodeBlocks IDE :  https://www.codeblocks.org/
-
-Sept 21 : V1 hardware and firmware from "Master" branch now running in my E46 Touring and E39 vehicles.
-
-March 24 : V1.1 Hardware and V2.05A firmware now running in 3 vehicles :
-
--BMW E39 with Lexus GS450H Drivetrain, Tesla PCS, ISA Shunt , Chademo Fast Charge
-
--BMW E46 Touring with Nissan Leaf Gen 1 Drivetrain, Outlander Charger / DCDC, ISA Shunt , CCS Fast Charge
-
--BMW E31 with Tesla LDU Drivetrain, Tesla DCDC, ISA Shunt , Chademo Fast Charge
-
-All hardware / software is tested in these vehicles before release. More vehicles with different configuration in progress to ensure as much testing as possible.
-
-Apr 26 : Added Zombie Relay box V1 full kicad project to hardware directory.
+# All hardware / software is tested in these vehicles before release. More vehicles with different configuration in progress to ensure as much testing as possible.
+Note: Only RELEASES are tested. Code in repository is to be treated as unproven and used as such

@@ -22,8 +22,10 @@
 #ifndef HWINIT_H_INCLUDED
 #define HWINIT_H_INCLUDED
 
+
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 void clock_setup(void);

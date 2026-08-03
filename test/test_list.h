@@ -23,13 +23,18 @@
 
 #include "test.h"
 
-class ThrottleTest : public IUnitTest {
-public:
-  virtual void RunTest();
+class ThrottleTest: public IUnitTest
+{
+   public:
+      virtual void RunTest();
 };
 
 #ifdef EXPORT_TESTLIST
-IUnitTest *testList[] = {new ThrottleTest(), NULL};
+IUnitTest* testList[] =
+{
+   new ThrottleTest(),
+   NULL
+};
 #endif
 
 #endif // TEST_LIST_H_INCLUDED

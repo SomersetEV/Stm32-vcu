@@ -19,12 +19,14 @@
 
 #ifndef DIGIPOT_H
 #define DIGIPOT_H
-#include "digio.h"
 #include "params.h"
+#include "digio.h"
 #include <libopencm3/stm32/spi.h>
 
-namespace DigiPot {
-void SetPot1Step();
-void SetPot2Step();
-} // namespace DigiPot
+namespace DigiPot
+{
+    void SetPot1Step();
+    void SetPot2Step();
+}
 #endif // DIGIPOT_H
+
