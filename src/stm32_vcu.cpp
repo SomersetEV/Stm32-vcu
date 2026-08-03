@@ -325,8 +325,8 @@ static void Ms200Task(void) {
     if (selectedBMS->MaxChargeCurrent() ==
         0) // BMS can command an AC charge shutdown if its current limit is 0
     {
-      RunChg = false; // end charge
-      ChgLck = true;  // set charge lockout flag
+      //RunChg = false; // end charge
+     // ChgLck = true;  // set charge lockout flag
     }
   }
   // End Charge Term Logic
