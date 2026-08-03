@@ -184,6 +184,7 @@
   VALUE_ENTRY(BMS_Tmin, "°C", 2086)                                            \
   VALUE_ENTRY(BMS_Tmax, "°C", 2087)                                            \
   VALUE_ENTRY(BMS_ChargeLim, "A", 2088)                                        \
+  VALUE_ENTRY(BMS_DischargeLim, "A", 2124)                                     \
   VALUE_ENTRY(BMS_MaxInput, "kW", 2105)                                        \
   VALUE_ENTRY(BMS_MaxOutput, "kW", 2106)                                       \
   VALUE_ENTRY(BMS_MaxCharge, "W", 2101)                                        \

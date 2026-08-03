@@ -29,13 +29,16 @@ public:
   void SetCanInterface(CanHardware *c) override;
   void DecodeCAN(int id, uint8_t *data) override;
   float MaxChargeCurrent() override;
+  float MaxDischargeCurrent() override;
   void Task100Ms() override;
 
 private:
   bool BMSDataValid();
   bool ChargeAllowed();
-  int chargeCurrentLimit =
-      0; // Sent by Simp as 0.1A per digit and stored the same way.
+  // CCL and DCL are sent by Simp as 0.1A per digit and scaled to amps on
+  // decode, so both of these are stored in amps.
+  float chargeCurrentLimit = 0;
+  float dischargeCurrentLimit = 0;
   int timeoutCounter = 0;
   float minCellV = 0;
   float maxCellV = 0;

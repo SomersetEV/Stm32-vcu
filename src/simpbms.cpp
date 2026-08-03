@@ -18,6 +18,7 @@
  */
 
 #include "simpbms.h"
+#include "my_math.h"
 
 /*
  * This module receives messages from SimpBMS and updates the
@@ -74,6 +75,17 @@ float SimpBMS::MaxChargeCurrent() {
   return chargeCurrentLimit;
 }
 
+// Return the maximum discharge current allowed by the BMS.
+float SimpBMS::MaxDischargeCurrent() {
+  // Not gated on ChargeAllowed() - that gate is charge specific and the BMS
+  // already applies its own derates to the discharge limit before sending it.
+  // Zero simply means "no data" here, the caller then leaves the configured
+  // limits alone rather than cutting drive power.
+  if (!BMSDataValid())
+    return 0;
+  return dischargeCurrentLimit;
+}
+
 // Process voltage and temperature message from SimpBMS.
 void SimpBMS::DecodeCAN(int id, uint8_t *data) {
   if (id == 0x373) {
@@ -93,8 +105,9 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
     // Reset timeout counter to the full timeout value
 
   } else if (id == 0x351) {
-    chargeCurrentLimit = (data[2] | (data[3] << 8)) * 0.1; // comes in 0.1A
-                                                           // scale
+    // CCL and DCL both come in 0.1A scale; stored here in amps.
+    chargeCurrentLimit = (data[2] | (data[3] << 8)) * 0.1;
+    dischargeCurrentLimit = (data[4] | (data[5] << 8)) * 0.1;
   } else if (id == 0x356) {
     batteryVoltage = (data[0] | (data[1] << 8)) * 0.01; // comes in 0.01V scale
 
@@ -113,6 +126,19 @@ void SimpBMS::Task100Ms() {
 
   // Update informational parameters.
   Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
+  Param::SetInt(Param::BMS_DischargeLim, MaxDischargeCurrent());
+
+  // Apply the BMS current limits to the drive current limits. On the Zombie
+  // positive idc is current into the pack, so idcmax is the charge (regen)
+  // limit and takes the CCL, while idcmin is the discharge (drive) limit and
+  // takes the negated DCL. Only written while the BMS is actually talking - on
+  // a timeout we do nothing here and the user configured limits stay in force,
+  // so a CAN dropout cannot cut drive.
+  if (BMSDataValid()) {
+    Param::SetFloat(Param::idcmax, MIN(chargeCurrentLimit, 5000.0));
+    Param::SetFloat(Param::idcmin, MAX(-dischargeCurrentLimit, -5000.0));
+  }
+
   Param::SetFloat(Param::BMS_Vmin, minCellV);
   Param::SetFloat(Param::BMS_Vmax, maxCellV);
   Param::SetFloat(Param::BMS_Tmin, minTempC);
