@@ -99,11 +99,11 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
     minTempC = minTemp - 273;
     maxTempC = maxTemp - 273;
 
-    // Reset timeout counter to the full timeout value
-    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
   } else if (id == 0x351) {
     chargeCurrentLimit = data[2] | (data[3] << 8);    // CCL, 0.1A per digit
     dischargeCurrentLimit = data[4] | (data[5] << 8); // DCL, 0.1A per digit
+    // Reset timeout counter to the full timeout value
+    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
   }
 
   else if (id == 0x356) {
@@ -139,26 +139,25 @@ void SimpBMS::Task100Ms() {
     // configured limits stay in force, so a CAN dropout cannot cut drive.
     Param::SetFloat(Param::idcmax, MIN(chargeCurrentLimit, 5000.0));
     Param::SetFloat(Param::idcmin, MAX(-dischargeCurrentLimit, -5000.0));
+  } else {
+    Param::SetFloat(Param::BMS_Vmin, 0);
+    Param::SetFloat(Param::BMS_Vmax, 0);
+    Param::SetFloat(Param::BMS_Tmin, 0);
+    Param::SetFloat(Param::BMS_Tmax, 0);
   }
-else {
-  Param::SetFloat(Param::BMS_Vmin, 0);
-  Param::SetFloat(Param::BMS_Vmax, 0);
-  Param::SetFloat(Param::BMS_Tmin, 0);
-  Param::SetFloat(Param::BMS_Tmax, 0);
-}
 
-if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
-{
-  Param::SetFloat(Param::udc, batteryVoltage);
-  Param::SetFloat(Param::udc2, batteryVoltage);
-  Param::SetFloat(Param::udcsw, batteryVoltage - 30);
-}
+  if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
+  {
+    Param::SetFloat(Param::udc, batteryVoltage);
+    Param::SetFloat(Param::udc2, batteryVoltage);
+    Param::SetFloat(Param::udcsw, batteryVoltage - 30);
+  }
 
-if (BMSDataValid()) {
-  Param::SetFloat(Param::idc, current);
-  Param::SetFloat(Param::SOC, stateOfCharge);
-} else {
-  Param::SetFloat(Param::idc, 0);
-  Param::SetFloat(Param::udcsw, 1000);
-}
+  if (BMSDataValid()) {
+    Param::SetFloat(Param::idc, current);
+    Param::SetFloat(Param::SOC, stateOfCharge);
+  } else {
+    Param::SetFloat(Param::idc, 0);
+    Param::SetFloat(Param::udcsw, 1000);
+  }
 }
