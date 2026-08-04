@@ -543,6 +543,9 @@ static void Ms10Task(void) {
   speed = selectedInverter->GetMotorSpeed(); // set motor rpm on interface
 
   Param::SetInt(Param::speed, speed);
+  Param::SetFloat(Param::CalcSpeedMPH,
+                  utils::CalcVehicleSpeedMPH(speed)); // calculated road speed
+                                                      // for the web interface
   utils::GetDigInputs(canInterface[Param::GetInt(Param::InverterCan)]);
 
   if (opmode == MOD_RUN ||

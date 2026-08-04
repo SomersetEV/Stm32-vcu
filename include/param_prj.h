@@ -27,7 +27,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 139
+//Next param id (increase when adding new parameter!): 146
 /*              category     name         unit       min     max     default id */
 #define PARAM_LIST \
     PARAM_ENTRY(CAT_SETUP,     Inverter,     INVMODES, 0,      8,      0,      5  ) \
@@ -79,6 +79,9 @@
     PARAM_ENTRY(CAT_THROTTLE,  throtrpmfilt,   "rpm/10ms",  0.1,    200,    15,    131 ) \
     PARAM_ENTRY(CAT_LEXUS,     Gear,        LOWHIGH,   0,      3,      0,      27 ) \
     PARAM_ENTRY(CAT_LEXUS,     OilPump,     "%",       0,      100,    50,     28 ) \
+    PARAM_ENTRY(CAT_SPEEDO,    DiffRatio,   "",        0.5,    10,     3.15,   143 ) \
+    PARAM_ENTRY(CAT_SPEEDO,    WheelCircum, "mm",      500,    4000,   2000,   144 ) \
+    PARAM_ENTRY(CAT_SPEEDO,    SpeedTrim,   "%",       50,     150,    100,    145 ) \
     PARAM_ENTRY(CAT_CRUISE,    cruisestep,  "rpm",     1,      1000,   200,    29 ) \
     PARAM_ENTRY(CAT_CRUISE,    cruiseramp,  "rpm/100ms",1,     1000,   20,     30 ) \
     PARAM_ENTRY(CAT_CRUISE,    regenlevel,  "",        0,      3,      2,      31 ) \
@@ -180,6 +183,7 @@
     VALUE_ENTRY(BMS_IsoMeas,   "mV",                2099 ) \
     VALUE_ENTRY(speed,         "rpm",               2016 ) \
     VALUE_ENTRY(Veh_Speed,     "kph",               2017 ) \
+    VALUE_ENTRY(CalcSpeedMPH,  "mph",               2109 ) \
     VALUE_ENTRY(torque,        "dig",               2018 ) \
     VALUE_ENTRY(pot,           "dig",               2019 ) \
     VALUE_ENTRY(pot2,          "dig",               2020 ) \
@@ -245,7 +249,7 @@
     VALUE_ENTRY(powerheater,   "W",                 2098 ) \
     VALUE_ENTRY(VehLockSt,     ONOFF,               2100 ) \
 
-//Next value Id: 2109
+//Next value Id: 2110
 
 //Dead params
 /*
@@ -305,6 +309,7 @@
 #define CAT_BMS      "Battery Management"
 #define CAT_CRUISE   "Cruise Control"
 #define CAT_LEXUS    "Gearbox Control"
+#define CAT_SPEEDO   "Speedometer"
 #define CAT_CHARGER  "Charger Control"
 #define CAT_DCDC     "DC-DC Converter"
 #define CAT_SHUNT    "ISA Shunt Control"

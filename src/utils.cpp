@@ -644,4 +644,54 @@ void GS450hOilPump(uint16_t pumpdc)
     }
 }
 
+#define GS450H_RATIO_LOW   3.9f  //Toyota hybrid transaxle low gear reduction
+#define GS450H_RATIO_HIGH  1.9f  //Toyota hybrid transaxle high gear reduction
+#define MM_PER_MIN_TO_MPH  0.0000372823f //60 / 1609344
+
+//Returns the gearbox reduction sitting between the motor and the final drive.
+//Only the toyota hybrid transaxles have one, everything else drives the diff directly.
+static float GetGearboxRatio()
+{
+    int inv = Param::GetInt(Param::Inverter);
+
+    if(inv != InvModes::GS450H && inv != InvModes::GS300H && inv != InvModes::Prius_Gen3)
+    {
+        return 1.0f;//no reduction between motor and diff
+    }
+
+    //GearFB is the real pressure switch feedback but is only refreshed in run mode
+    if(Param::GetInt(Param::opmode) == MOD_RUN)
+    {
+        return (Param::GetInt(Param::GearFB) == 1) ? GS450H_RATIO_HIGH : GS450H_RATIO_LOW;
+    }
+
+    //Not running so fall back to the requested gear
+    switch(Param::GetInt(Param::Gear))
+    {
+    case 1: //High
+        return GS450H_RATIO_HIGH;
+    case 3: //High in FWD and Low in REV
+        return (Param::GetInt(Param::dir) == -1) ? GS450H_RATIO_LOW : GS450H_RATIO_HIGH;
+    case 2: //Auto always powers on in low
+    case 0: //Low
+    default:
+        return GS450H_RATIO_LOW;
+    }
+}
+
+//Derive road speed in mph from motor rpm, gearbox ratio, final drive and rolling circumference.
+//Always positive so reverse reads the same as forward on a gauge.
+float CalcVehicleSpeedMPH(int16_t motorRpm)
+{
+    float diffRatio = Param::GetFloat(Param::DiffRatio);
+    float circum = Param::GetFloat(Param::WheelCircum);
+    float totalRatio = GetGearboxRatio() * diffRatio;
+
+    if(totalRatio <= 0.0f || circum <= 0.0f) return 0.0f;//never divide by zero
+
+    float wheelRpm = ABS(motorRpm) / totalRatio;
+
+    return wheelRpm * circum * MM_PER_MIN_TO_MPH * (Param::GetFloat(Param::SpeedTrim) * 0.01f);
+}
+
 }// namespace utils

@@ -52,6 +52,7 @@ namespace utils
     void SpeedoSet(uint16_t speed);
     void SpeedoStart();
     void GS450hOilPump(uint16_t pumpdc);
+    float CalcVehicleSpeedMPH(int16_t motorRpm);
 }
 
 #endif
