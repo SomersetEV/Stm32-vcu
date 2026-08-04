@@ -51,6 +51,7 @@ void CpSpoofOutput();
 void SpeedoSet(uint16_t speed);
 void SpeedoStart();
 void GS450hOilPump(uint16_t pumpdc);
+float CalcVehicleSpeedMPH(int16_t motorRpm);
 void SetTempgaugePWM(bool en);
 void SetSocgaugePWM(bool en);
 } // namespace utils

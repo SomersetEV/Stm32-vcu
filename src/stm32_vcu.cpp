@@ -325,8 +325,8 @@ static void Ms200Task(void) {
     if (selectedBMS->MaxChargeCurrent() ==
         0) // BMS can command an AC charge shutdown if its current limit is 0
     {
-      //RunChg = false; // end charge
-     // ChgLck = true;  // set charge lockout flag
+      // RunChg = false; // end charge
+      // ChgLck = true;  // set charge lockout flag
     }
   }
   // End Charge Term Logic
@@ -655,6 +655,9 @@ static void Ms10Task(void) {
   speed = selectedInverter->GetMotorSpeed(); // set motor rpm on interface
 
   Param::SetInt(Param::speed, speed);
+  Param::SetFloat(Param::CalcSpeedMPH,
+                  utils::CalcVehicleSpeedMPH(speed)); // calculated road speed
+                                                      // for the web interface
   utils::GetDigInputs(canInterface[Param::GetInt(Param::InverterCan)]);
 
   if (opmode == MOD_RUN ||
