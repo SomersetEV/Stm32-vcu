@@ -50,7 +50,6 @@ private:
   static uint8_t chgStatus, evseDuty;
   static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
   static float LV_Volts, LV_Amps;
-  static uint16_t batteryVolts;
 
   static void handle377(uint32_t data[2]);
   static void handle389(uint32_t data[2]);

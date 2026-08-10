@@ -42,7 +42,6 @@
 #include "NoInverter.h"
 #include "NoVehicle.h"
 #include "OutlanderCanHeater.h"
-#include "OutlanderHeartBeat.h"
 #include "TeslaDCDC.h"
 #include "VWAirHeater.h"
 #include "VWCoolantHeater.h"
@@ -138,7 +137,6 @@ static bool StartSig = false;
 static bool ACrequest = false;
 static bool initbyStart = false;
 static bool initbyCharge = false;
-static bool OutlanderCAN = false;
 static bool ExtHVreq = false;
 static bool CheckHVIL = 0;
 static bool HVILok = 0;
@@ -396,10 +394,6 @@ static void Ms100Task(void) {
   selectedHeater->Task100Ms();
   canMap->SendAll();
   canSdo->TriggerTimeout(100);
-
-  if (OutlanderCAN == true) {
-    OutlanderHeartBeat::Task100Ms();
-  }
 
   // Setting reverse light
   if (Param::GetInt(Param::dir) < 0) {
@@ -905,14 +899,12 @@ static void UpdateInv() {
     break;
   case InvModes::Outlander:
     selectedInverter = &outlanderInv;
-    OutlanderCAN = true;
     break;
   case InvModes::OpenI:
     selectedInverter = &openInv;
     break;
   case InvModes::RearOutlander:
     selectedInverter = &rearoutlanderInv;
-    OutlanderCAN = true;
     break;
   }
   // This will call SetCanFilters() via the Clear Callback
@@ -975,7 +967,6 @@ static void UpdateCharger() {
     break;
   case ChargeModes::Out_lander:
     selectedCharger = &outChg;
-    OutlanderCAN = true;
     break;
   case ChargeModes::Elcon:
     selectedCharger = &ChargerElcon;
@@ -1032,7 +1023,6 @@ static void UpdateHeater() {
     break;
   case HeatType::OutlanderHeater:
     selectedHeater = &outlanderCanHeater;
-    OutlanderCAN = true;
     break;
   }
   // This will call SetCanFilters() via the Clear Callback

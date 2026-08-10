@@ -17,7 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "OutlanderHeartBeat.h"
 #include <OutlanderCanHeater.h>
 
 void OutlanderCanHeater::SetPower(uint16_t power, bool HeatReq) {
@@ -26,8 +25,8 @@ void OutlanderCanHeater::SetPower(uint16_t power, bool HeatReq) {
 }
 
 void OutlanderCanHeater::SetCanInterface(CanHardware *c) {
-  OutlanderHeartBeat::SetCanInterface(c); // set Outlander Heartbeat on same CAN
-
+  // Note: 0x285 is sent by whichever Outlander inverter/charger is selected, as
+  // it was pre-2.40. This heater does not emit it on its own.
   can = c;
   can->RegisterUserMessage(0x398);
 }
