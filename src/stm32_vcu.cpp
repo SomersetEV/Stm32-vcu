@@ -36,15 +36,15 @@
 #include "GS450H.h"
 #include "JLR_G1.h"
 #include "JLR_G2.h"
+#include "MGCoolantHeater.h"
 #include "NissanPDM.h"
 #include "NoInverter.h"
 #include "NoVehicle.h"
 #include "OutlanderCanHeater.h"
 #include "OutlanderHeartBeat.h"
 #include "TeslaDCDC.h"
-#include "VWCoolantHeater.h"
 #include "VWAirHeater.h"
-#include "MGCoolantHeater.h"
+#include "VWCoolantHeater.h"
 #include "V_Classic.h"
 #include "amperacharger.h"
 #include "amperaheater.h"
@@ -447,35 +447,41 @@ static void Ms100Task(void) {
              Param::GetInt(Param::GPA2Func) ==
                  IOMatrix::HEATER_POT) // check if Analogue Heater input used
   {
-    int htrPotVal =
-        IOMatrix::GetAnaloguePin(IOMatrix::HEATER_POT)->Get(); // Get input value
+    int htrPotVal = IOMatrix::GetAnaloguePin(IOMatrix::HEATER_POT)
+                        ->Get(); // Get input value
     Param::SetInt(Param::HtPotVal, htrPotVal);
 
     if (Param::GetInt(Param::HeatPotDir) == 2 ||
-        Param::GetInt(Param::HeatPotDir) == 3) // If higher than threshold is HEAT ON
+        Param::GetInt(Param::HeatPotDir) ==
+            3) // If higher than threshold is HEAT ON
     {
-      if (htrPotVal > Param::GetInt(Param::HeatPotOn)) // if value is above threshold
+      if (htrPotVal >
+          Param::GetInt(Param::HeatPotOn)) // if value is above threshold
       {
         if (Param::GetInt(Param::HeatPotDir) == 3)
-          Param::SetInt(Param::HeatPercnt,
-                        utils::change(htrPotVal, Param::GetInt(Param::HeatPotOn),
-                                      Param::GetInt(Param::HeatPotFull), 0,
-                                      100)); // map threshold to 0 and full to 100
-        Param::SetInt(Param::HeatReq, 1);    // On
+          Param::SetInt(
+              Param::HeatPercnt,
+              utils::change(htrPotVal, Param::GetInt(Param::HeatPotOn),
+                            Param::GetInt(Param::HeatPotFull), 0,
+                            100));        // map threshold to 0 and full to 100
+        Param::SetInt(Param::HeatReq, 1); // On
       } else {
         Param::SetInt(Param::HeatReq, 0); // Off
       }
     } else if (Param::GetInt(Param::HeatPotDir) == 0 ||
-               Param::GetInt(Param::HeatPotDir) == 1) // If lower than threshold is HEAT ON
+               Param::GetInt(Param::HeatPotDir) ==
+                   1) // If lower than threshold is HEAT ON
     {
-      if (htrPotVal < Param::GetInt(Param::HeatPotOn)) // if value is below threshold
+      if (htrPotVal <
+          Param::GetInt(Param::HeatPotOn)) // if value is below threshold
       {
         if (Param::GetInt(Param::HeatPotDir) == 1)
-          Param::SetInt(Param::HeatPercnt,
-                        utils::change(htrPotVal, Param::GetInt(Param::HeatPotOn),
-                                      Param::GetInt(Param::HeatPotFull), 0,
-                                      100)); // map threshold to 100 and full to 0
-        Param::SetInt(Param::HeatReq, 1);    // On
+          Param::SetInt(
+              Param::HeatPercnt,
+              utils::change(htrPotVal, Param::GetInt(Param::HeatPotOn),
+                            Param::GetInt(Param::HeatPotFull), 0,
+                            100));        // map threshold to 100 and full to 0
+        Param::SetInt(Param::HeatReq, 1); // On
       } else {
         Param::SetInt(Param::HeatReq, 0); // Off
       }
@@ -627,9 +633,9 @@ static void Ms10Task(void) {
   case MOD_OFF:
     initbyStart = false;
     initbyCharge = false;
-    DigIo::inv_out.Clear();                           // inverter power off
+    DigIo::inv_out.Clear();                              // inverter power off
     IOMatrix::GetPinOut(IOMatrix::COOLANTPUMP)->Clear(); // Coolant pump off if
-                                                      // used
+                                                         // used
     Param::SetInt(
         Param::dir,
         0); // shift to park/neutral on shutdown regardless of shifter pos
@@ -651,7 +657,7 @@ static void Ms10Task(void) {
         StartSig = true;
         opmode = MOD_PRECHARGE; // proceed to precharge if 1)throttle not
                                 // pressed , 2)ign on , 3)start signal rx
-        rlyDly = 25; // Recharge sequence timer
+        rlyDly = 25;            // Recharge sequence timer
         vehicleStartTime = rtc_get_counter_val();
         initbyStart = true;
       }

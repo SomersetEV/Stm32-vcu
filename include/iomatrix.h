@@ -21,45 +21,59 @@
 #ifndef IOMATRIX_H
 #define IOMATRIX_H
 
+#include "anain.h"
 #include "digio.h"
 #include "params.h"
-#include "anain.h"
 
-class IOMatrix
-{
-   public://order of these matters!
-      enum pininfuncs
-      {
-         NONEIN, HEATREQ, HVREQ, DCFCREQUEST, LAST_IN
-      };
-            //order of these matters!
-      enum pinoutfuncs
-      {
-         NONEOUT, CHADEMOALLOW, OBCENABLE, HEATERENABLE, RUNINDICATION, WARNINDICATION,
-         COOLANTPUMP, NEGCONTACTOR, BRAKELIGHT, REVERSELIGHT, BRAKEVACPUMP,
-         COOLINGFAN, HVACTIVE, PWM_TIM3, CP_SPOOF, GS450HOIL, LAST_OUT
-      };
-            //order of these matters!
-      enum analoguepinfuncs
-      {
-         NONE_ANAL, PILOT_PROX, VAC_SENSOR, HEATER_POT, LAST_ANAL
-      };
+class IOMatrix {
+public: // order of these matters!
+  enum pininfuncs { NONEIN, HEATREQ, HVREQ, DCFCREQUEST, LAST_IN };
+  // order of these matters!
+  enum pinoutfuncs {
+    NONEOUT,
+    CHADEMOALLOW,
+    OBCENABLE,
+    HEATERENABLE,
+    RUNINDICATION,
+    WARNINDICATION,
+    COOLANTPUMP,
+    NEGCONTACTOR,
+    BRAKELIGHT,
+    REVERSELIGHT,
+    BRAKEVACPUMP,
+    COOLINGFAN,
+    HVACTIVE,
+    PWM_TIM3,
+    CP_SPOOF,
+    GS450HOIL,
+    LAST_OUT
+  };
+  // order of these matters!
+  enum analoguepinfuncs {
+    NONE_ANAL,
+    PILOT_PROX,
+    VAC_SENSOR,
+    HEATER_POT,
+    LAST_ANAL
+  };
 
-      static void AssignFromParams();
-      static void AssignFromParamsAnalogue();
-      static DigIo* GetPinIn(pininfuncs f) { return functionToPinIn[f]; }
-      static DigIo* GetPinOut(pinoutfuncs f) { return functionToPinOut[f]; }
-      static AnaIn* GetAnaloguePin(analoguepinfuncs f) { return functionToPinAnalgoue[f]; }
+  static void AssignFromParams();
+  static void AssignFromParamsAnalogue();
+  static DigIo *GetPinIn(pininfuncs f) { return functionToPinIn[f]; }
+  static DigIo *GetPinOut(pinoutfuncs f) { return functionToPinOut[f]; }
+  static AnaIn *GetAnaloguePin(analoguepinfuncs f) {
+    return functionToPinAnalgoue[f];
+  }
 
-   private:
-      static DigIo* functionToPinIn[LAST_IN];
-      static DigIo* functionToPinOut[LAST_OUT];
-      static const int numPins = 13;
-      static DigIo* const paramToPin[numPins];
+private:
+  static DigIo *functionToPinIn[LAST_IN];
+  static DigIo *functionToPinOut[LAST_OUT];
+  static const int numPins = 13;
+  static DigIo *const paramToPin[numPins];
 
-      static AnaIn* functionToPinAnalgoue[LAST_ANAL];
-      static const int numAnaloguePins = 2;
-      static AnaIn* const paramToPinAnalgue[numAnaloguePins];
+  static AnaIn *functionToPinAnalgoue[LAST_ANAL];
+  static const int numAnaloguePins = 2;
+  static AnaIn *const paramToPinAnalgue[numAnaloguePins];
 };
 
 #endif // IOMATRIX_H
