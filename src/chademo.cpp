@@ -192,7 +192,7 @@ void FCChademo::Task200Ms()
     if ((rtc_get_counter_val() - chademoStartTime) > 4 && (rtc_get_counter_val() - chademoStartTime) < 8)
     {
         FCChademo::SetEnabled(true);
-        IOMatrix::GetPin(IOMatrix::CHADEMOALLOW)->Set();//never gets here ...
+        IOMatrix::GetPinOut(IOMatrix::CHADEMOALLOW)->Set();//never gets here ...
     }
 
     if (Param::GetInt(Param::opmode) == MOD_CHARGE && FCChademo::ConnectorLocked())
@@ -232,7 +232,7 @@ void FCChademo::Task200Ms()
     {
         FCChademo::SetChargeCurrent(0);
         FCChademo::SetEnabled(false);
-        IOMatrix::GetPin(IOMatrix::CHADEMOALLOW)->Clear();//FCChademo charge allow off
+        IOMatrix::GetPinOut(IOMatrix::CHADEMOALLOW)->Clear();//FCChademo charge allow off
         chargeMode = false;
     }
 
@@ -247,7 +247,7 @@ bool FCChademo::DCFCRequest(bool RunCh)
 {
     if (RunCh)
     {
-        if (IOMatrix::GetPin(IOMatrix::DCFCREQUEST) != &DigIo::dummypin &&IOMatrix::GetPin(IOMatrix::DCFCREQUEST)->Get()) //
+        if (IOMatrix::GetPinIn(IOMatrix::DCFCREQUEST) != &DigIo::dummypin &&IOMatrix::GetPinIn(IOMatrix::DCFCREQUEST)->Get()) //
         {
             return true;
         }
@@ -255,7 +255,7 @@ bool FCChademo::DCFCRequest(bool RunCh)
 
     FCChademo::SetChargeCurrent(0);
     FCChademo::SetEnabled(false);
-    IOMatrix::GetPin(IOMatrix::CHADEMOALLOW)->Clear();//FCChademo charge allow off
+    IOMatrix::GetPinOut(IOMatrix::CHADEMOALLOW)->Clear();//FCChademo charge allow off
     chademoStartTime=0;
     return false;
 }

@@ -28,26 +28,32 @@
 class IOMatrix
 {
    public://order of these matters!
-      enum pinfuncs
+      enum pininfuncs
       {
-         NONE, CHADEMOALLOW, OBCENABLE, HEATERENABLE, RUNINDICATION, WARNINDICATION,
-         COOLANTPUMP, NEGCONTACTOR, BRAKELIGHT, REVERSELIGHT, HEATREQ, HVREQ,
-         DCFCREQUEST, BRAKEVACPUMP, COOLINGFAN, HVACTIVE, PWM_TIM3,CP_SPOOF,
-         GS450HOIL, LAST
+         NONEIN, HEATREQ, HVREQ, DCFCREQUEST, LAST_IN
+      };
+            //order of these matters!
+      enum pinoutfuncs
+      {
+         NONEOUT, CHADEMOALLOW, OBCENABLE, HEATERENABLE, RUNINDICATION, WARNINDICATION,
+         COOLANTPUMP, NEGCONTACTOR, BRAKELIGHT, REVERSELIGHT, BRAKEVACPUMP,
+         COOLINGFAN, HVACTIVE, PWM_TIM3, CP_SPOOF, GS450HOIL, LAST_OUT
       };
             //order of these matters!
       enum analoguepinfuncs
       {
-         NONE_ANAL, PILOT_PROX, VAC_SENSOR, LAST_ANAL
+         NONE_ANAL, PILOT_PROX, VAC_SENSOR, HEATER_POT, LAST_ANAL
       };
 
       static void AssignFromParams();
       static void AssignFromParamsAnalogue();
-      static DigIo* GetPin(pinfuncs f) { return functionToPin[f]; }
+      static DigIo* GetPinIn(pininfuncs f) { return functionToPinIn[f]; }
+      static DigIo* GetPinOut(pinoutfuncs f) { return functionToPinOut[f]; }
       static AnaIn* GetAnaloguePin(analoguepinfuncs f) { return functionToPinAnalgoue[f]; }
 
    private:
-      static DigIo* functionToPin[LAST];
+      static DigIo* functionToPinIn[LAST_IN];
+      static DigIo* functionToPinOut[LAST_OUT];
       static const int numPins = 13;
       static DigIo* const paramToPin[numPins];
 
