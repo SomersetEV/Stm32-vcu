@@ -688,27 +688,20 @@ static void Ms10Task(void) {
     initbyCharge = false;
     preheater.SetInitByPreHeat(false);
 
-    DigIo::inv_out.Clear();                              // inverter power off
+    DigIo::inv_out.Clear(); // inverter power off
+    DigIo::dcsw_out.Clear();
+    IOMatrix::GetPinOut(IOMatrix::NEGCONTACTOR)
+        ->Clear(); // Negative contactors off if used
     IOMatrix::GetPinOut(IOMatrix::COOLANTPUMP)->Clear(); // Coolant pump off if
                                                          // used
+    DigIo::prec_out.Clear();
+    selectedCharger->Off(); // send message to charger to shut down
     Param::SetInt(
         Param::dir,
         0); // shift to park/neutral on shutdown regardless of shifter pos
     selectedVehicle->DashOff();
 
     StartSig = false; // reset for next time
-
-    if (rlyDly != 0) {
-      rlyDly--; // here we are going to pause to allow system shut down before
-                // opening HV contactors
-      selectedCharger->Off(); // send message to charger to shut down
-    }
-    if (rlyDly == 0) {
-      DigIo::dcsw_out.Clear();
-      IOMatrix::GetPinOut(IOMatrix::NEGCONTACTOR)
-          ->Clear(); // Negative contactors off if used
-      DigIo::prec_out.Clear();
-    }
 
     if (Param::GetInt(Param::pot) < Param::GetInt(Param::potmin)) {
       if (selectedVehicle->Start() && selectedVehicle->Ready() &&
@@ -717,24 +710,24 @@ static void Ms10Task(void) {
         opmode = MOD_PRECHARGE; // proceed to precharge if 1)throttle not
                                 // pressed , 2)ign on , 3)start signal rx, 4) HV
                                 // IL input is grounded if selected.
-        rlyDly = 25;            // Recharge sequence timer
         vehicleStartTime = rtc_get_counter_val();
         initbyStart = true;
       }
     }
     if (chargeMode) {
       opmode = MOD_PRECHARGE; // proceed to precharge if charge requested.
-      rlyDly = 25;            // Recharge sequence timer
       vehicleStartTime = rtc_get_counter_val();
       initbyCharge = true;
     }
     if (preheater.GetRunPreHeat()) {
       opmode = MOD_PRECHARGE; // proceed to precharge if charge requested.
-      rlyDly = 25;            // Recharge sequence timer
       vehicleStartTime = rtc_get_counter_val();
       preheater.SetInitByPreHeat(true);
     }
     Param::SetInt(Param::opmode, opmode);
+    rlyDly = 25;            // Recharge sequence timer
+    prechargeMinTime = 100; // 1 second minimum precharge, re-armed each off
+                            // cycle
     break;
 
   case MOD_PRECHARGE:
@@ -817,7 +810,6 @@ static void Ms10Task(void) {
     ErrorMessage::UnpostAll();
     if (!chargeMode) {
       opmode = MOD_OFF;
-      rlyDly = 300; // Recharge sequence timer for delayed shutdown
     }
     Param::SetInt(Param::opmode, opmode);
     break;
@@ -834,7 +826,6 @@ static void Ms10Task(void) {
     ErrorMessage::UnpostAll();
     if (!selectedVehicle->Ready()) {
       opmode = MOD_OFF;
-      rlyDly = 300; // Recharge sequence timer for delayed shutdown
     }
     Param::SetInt(Param::opmode, opmode);
     break;
@@ -848,10 +839,6 @@ static void Ms10Task(void) {
     }
 
     preheater.Ms10Task();
-
-    if (!preheater.GetRunPreHeat()) {
-      rlyDly = 300; // Recharge sequence timer for delayed shutdown
-    }
     break;
   }
 
