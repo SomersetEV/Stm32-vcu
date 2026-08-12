@@ -90,6 +90,7 @@
 		<Unit filename="include/digio_prj.h" />
 		<Unit filename="include/errormessage_prj.h" />
 		<Unit filename="include/extCharger.h" />
+		<Unit filename="include/foshaninverter.h" />
 		<Unit filename="include/heater.h" />
 		<Unit filename="include/hwdefs.h" />
 		<Unit filename="include/hwinit.h" />
@@ -186,6 +187,7 @@
 		<Unit filename="src/chademo.cpp" />
 		<Unit filename="src/daisychainbms.cpp" />
 		<Unit filename="src/extCharger.cpp" />
+		<Unit filename="src/foshaninverter.cpp" />
 		<Unit filename="src/hwinit.cpp" />
 		<Unit filename="src/i3LIM.cpp" />
 		<Unit filename="src/iomatrix.cpp" />

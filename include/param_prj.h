@@ -26,11 +26,11 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-// Next param id (increase when adding new parameter!): 157
+// Next param id (increase when adding new parameter!): 159
 /*              category     name         unit       min     max     default id
  */
 #define PARAM_LIST                                                             \
-  PARAM_ENTRY(CAT_SETUP, Inverter, INVMODES, 0, 8, 0, 5)                       \
+  PARAM_ENTRY(CAT_SETUP, Inverter, INVMODES, 0, 9, 0, 5)                       \
   PARAM_ENTRY(CAT_SETUP, Vehicle, VEHMODES, 0, 8, 0, 6)                        \
   PARAM_ENTRY(CAT_SETUP, GearLvr, SHIFTERS, 0, 4, 0, 108)                      \
   PARAM_ENTRY(CAT_SETUP, Transmission, TRNMODES, 0, 1, 0, 78)                  \
@@ -150,6 +150,8 @@
   PARAM_ENTRY(CAT_IOPINS, DigiPot2Step, "dig", 0, 255, 0, 118)                 \
   PARAM_ENTRY(CAT_IOPINS, FanTemp, "°C", 0, 100, 40, 134)                      \
   PARAM_ENTRY(CAT_IOPINS, TachoPPR, "PPR", 0, 100, 2, 136)                     \
+  PARAM_ENTRY(CAT_FOSHAN, FoshanMaxTrq, "Nm", 0, 1000, 150, 157)               \
+  PARAM_ENTRY(CAT_FOSHAN, FoshanFltRst, ONOFF, 0, 1, 0, 158)                   \
   PARAM_ENTRY(CAT_SHUNT, IsaInit, ONOFF, 0, 1, 0, 75)                          \
   PARAM_ENTRY(CAT_PWM, Tim3_Presc, "", 1, 72000, 719, 100)                     \
   PARAM_ENTRY(CAT_PWM, Tim3_Period, "", 1, 100000, 7200, 101)                  \
@@ -267,9 +269,11 @@
   VALUE_ENTRY(DMA_TxComplete, ONOFF, 2120)                                     \
   VALUE_ENTRY(DMA_RxTimeout, "", 2121)                                         \
   VALUE_ENTRY(DMA_ConsecFail, "", 2122)                                        \
-  VALUE_ENTRY(HTM_State, "", 2123)
+  VALUE_ENTRY(HTM_State, "", 2123)                                             \
+  VALUE_ENTRY(FoshanFault, "", 2124)                                           \
+  VALUE_ENTRY(FoshanDTC, "", 2125)
 
-// Next value Id: 2124
+// Next value Id: 2126
 
 // Dead params
 /*
@@ -304,7 +308,7 @@
   "0=Button, 1=Switch, 2=ButtonReversed, 3=SwitchReversed, 4=DefaultForward"
 #define INVMODES                                                               \
   "0=None, 1=Leaf_Gen1, 2=GS450H, 3=UserCAN, 4=OpenI, 5=Prius_Gen3, "          \
-  "6=Outlander, 7=GS300H, 8=RearOutlander"
+  "6=Outlander, 7=GS300H, 8=RearOutlander, 9=FoshanMotor"
 #define PLTMODES                                                               \
   "0=Absent, 1=ACStd, 2=ACchg, 3=Error, 4=CCS_Not_Rdy, 5=CCS_Rdy, 6=Static"
 #define VEHMODES                                                               \
@@ -360,6 +364,7 @@
 #define CAT_BMS "Battery Management"
 #define CAT_CRUISE "Cruise Control"
 #define CAT_LEXUS "Gearbox Control"
+#define CAT_FOSHAN "Foshan Motor"
 #define CAT_CHARGER "Charger Control"
 #define CAT_DCDC "DC-DC Converter"
 #define CAT_SHUNT "ISA Shunt Control"
@@ -409,7 +414,8 @@ enum InvModes {
   Prius_Gen3 = 5,
   Outlander = 6,
   GS300H = 7,
-  RearOutlander = 8
+  RearOutlander = 8,
+  FoshanMotor = 9
 };
 
 enum ChargeModes {

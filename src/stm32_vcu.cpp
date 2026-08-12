@@ -63,6 +63,7 @@
 #include "digipot.h"
 #include "errormessage.h"
 #include "extCharger.h"
+#include "foshaninverter.h"
 #include "heater.h"
 #include "hwdefs.h"
 #include "hwinit.h"
@@ -204,6 +205,7 @@ static DCDC *selectedDCDC = &DCDCnone;
 static Can_OBD2 canOBD2;
 static Shifter shifterNone;
 static RearOutlanderInverter rearoutlanderInv;
+static FoshanInverter foshanInv;
 static LinBus *lin;
 static Preheater preheater;
 
@@ -914,6 +916,9 @@ static void UpdateInv() {
     selectedInverter = &rearoutlanderInv;
     OutlanderCAN = true;
     break;
+  case InvModes::FoshanMotor:
+    selectedInverter = &foshanInv;
+    break;
   }
   // This will call SetCanFilters() via the Clear Callback
   canInterface[0]->ClearUserMessages();
@@ -1217,7 +1222,8 @@ void Param::Change(Param::PARAM_NUM paramNum) {
   }
 
   if (Param::GetInt(Param::reversemotor) != 0) {
-    if (Param::GetInt(Param::Inverter) == InvModes::RearOutlander) {
+    int inv = Param::GetInt(Param::Inverter);
+    if (inv == InvModes::RearOutlander || inv == InvModes::FoshanMotor) {
 
     } else {
       Param::SetInt(Param::reversemotor, 0);
