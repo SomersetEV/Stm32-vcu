@@ -251,9 +251,17 @@
   VALUE_ENTRY(udcheater, "V", 2097)                                            \
   VALUE_ENTRY(powerheater, "W", 2098)                                          \
   VALUE_ENTRY(VehLockSt, ONOFF, 2100)                                          \
-  VALUE_ENTRY(HtPotVal, "dig", 2110)
+  VALUE_ENTRY(HtPotVal, "dig", 2110)                                           \
+  VALUE_ENTRY(MG1Raw, "", 2116)                                                \
+  VALUE_ENTRY(MG1Raw2, "", 2118)                                               \
+  VALUE_ENTRY(DMA_RxComplete, ONOFF, 2119)                                     \
+  VALUE_ENTRY(DMA_TxComplete, ONOFF, 2120)                                     \
+  VALUE_ENTRY(DMA_RxTimeout, "", 2121)                                         \
+  VALUE_ENTRY(DMA_ConsecFail, "", 2122)                                        \
+  VALUE_ENTRY(HTM_State, "", 2123)                                             \
+  VALUE_ENTRY(MG2Raw, "", 2124)
 
-// Next value Id: 2118
+// Next value Id: 2125
 
 // Dead params
 /*

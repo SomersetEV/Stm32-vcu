@@ -107,7 +107,7 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
   }
 
   else if (id == 0x356) {
-    batteryVoltage = (data[0] | (data[1] << 8)) * 0.1; // comes in 0.01V scale
+    batteryVoltage = (data[0] | (data[1] << 8)) * 0.1; // comes in 0.1V scale
 
     int16_t rawCurrent = (int16_t)(data[2] | (data[3] << 8));
     current = rawCurrent * 0.1f; // comes in 0.1A scale
@@ -133,12 +133,16 @@ void SimpBMS::Task100Ms() {
     Param::SetFloat(Param::BMS_Tmax, maxTempC);
 
     // Apply the BMS current limits to the drive current limits.
-    // idcmax is the positive (discharge) limit, idcmin the negative
-    // (regen, which charges the pack) limit. Only written while the BMS is
-    // actually talking - on a timeout we do nothing here and the user
-    // configured limits stay in force, so a CAN dropout cannot cut drive.
-    Param::SetFloat(Param::idcmax, MIN(chargeCurrentLimit, 5000.0));
-    Param::SetFloat(Param::idcmin, MAX(-dischargeCurrentLimit, -5000.0));
+    // idcmax is the positive (discharge) limit and so takes the DCL, idcmin
+    // the negative (regen, which charges the pack) limit and so takes the CCL.
+    // IdcLimitCommand is fed ABS(idc) and picks its branch from the sign of the
+    // torque request, so this mapping holds regardless of the sign convention
+    // used for idc itself. Both limits arrive at 0.1A per digit and need
+    // scaling. Only written while the BMS is actually talking - on a timeout we
+    // do nothing here and the user configured limits stay in force, so a CAN
+    // dropout cannot cut drive.
+    Param::SetFloat(Param::idcmax, MIN(dischargeCurrentLimit * 0.1f, 5000.0f));
+    Param::SetFloat(Param::idcmin, MAX(-chargeCurrentLimit * 0.1f, -5000.0f));
   } else {
     Param::SetFloat(Param::BMS_Vmin, 0);
     Param::SetFloat(Param::BMS_Vmax, 0);
