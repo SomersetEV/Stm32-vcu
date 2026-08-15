@@ -118,6 +118,11 @@ void SimpBMS::Task100Ms() {
   Param::SetFloat(Param::BMS_Tmin, minTempC);
   Param::SetFloat(Param::BMS_Tmax, maxTempC);
 
+  if (BMSDataValid()) // Hold the last good SOC if the BMS drops out
+  {
+    Param::SetFloat(Param::SOC, stateOfCharge);
+  }
+
   if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
   {
     Param::SetFloat(Param::udc2, batteryVoltage);

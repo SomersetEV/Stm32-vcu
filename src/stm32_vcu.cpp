@@ -389,8 +389,9 @@ static void Ms100Task(void) {
   int opmode = Param::GetInt(Param::opmode);
   utils::SelectDirection(selectedVehicle, selectedShifter);
 
-  if (Param::GetInt(Param::ShuntType) != 0) // Do not do any SOC calcs
-  {
+  // Do not do any SOC calcs without a shunt, or when the selected BMS
+  // reports SOC itself - otherwise we would overwrite the BMS value.
+  if (Param::GetInt(Param::ShuntType) != 0 && !selectedBMS->ProvidesSOC()) {
     utils::CalcSOC();
   }
 

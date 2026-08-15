@@ -29,6 +29,7 @@ public:
   void SetCanInterface(CanHardware *c) override;
   void DecodeCAN(int id, uint8_t *data) override;
   float MaxChargeCurrent() override;
+  bool ProvidesSOC() override { return true; };
   void Task100Ms() override;
 
 private:

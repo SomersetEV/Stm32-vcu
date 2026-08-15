@@ -40,6 +40,10 @@ public:
   virtual void DecodeCAN(int, uint8_t *) {};
   virtual void DeInit() {};
   virtual float MaxChargeCurrent() { return 9999.0; };
+  /* Return true if this BMS reports a state of charge and writes it to
+   * Param::SOC itself. The VCU then skips its own kWh counter based
+   * estimate rather than overwriting the BMS value. */
+  virtual bool ProvidesSOC() { return false; };
   virtual void Task100Ms() {
     Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
     Param::SetFloat(Param::BMS_Vmin, 0);
