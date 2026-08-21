@@ -128,15 +128,10 @@ void SimpBMS::Task100Ms() {
   Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
   Param::SetInt(Param::BMS_DischargeLim, MaxDischargeCurrent());
 
-  // Apply the BMS current limits to the drive current limits. On the Zombie
-  // positive idc is current into the pack, so idcmax is the charge (regen)
-  // limit and takes the CCL, while idcmin is the discharge (drive) limit and
-  // takes the negated DCL. Only written while the BMS is actually talking - on
-  // a timeout we do nothing here and the user configured limits stay in force,
-  // so a CAN dropout cannot cut drive.
+  // Apply the BMS current limits to the drive current limits.
   if (BMSDataValid()) {
-    Param::SetFloat(Param::idcmax, MIN(chargeCurrentLimit, 5000.0));
-    Param::SetFloat(Param::idcmin, MAX(-dischargeCurrentLimit, -5000.0));
+    Param::SetFloat(Param::idcmax, MIN(dischargeCurrentLimit * 0.1f, 5000.0f));
+    Param::SetFloat(Param::idcmin, MAX(-chargeCurrentLimit * 0.1f, -5000.0f));
   }
 
   Param::SetFloat(Param::BMS_Vmin, minCellV);
