@@ -68,13 +68,13 @@ void OutlanderHeartBeat::Task100Ms() {
     bytes[7] = 0x10;
   }
 
-  if (MOD_CHARGE == opmode || MOD_RUN == opmode) {
-    can1->Send(0x285, (uint32_t *)bytes, 8);
+  // if (MOD_CHARGE == opmode || MOD_RUN == opmode) {
+  can1->Send(0x285, (uint32_t *)bytes, 8);
 
-    if (DualCan) {
-      can2->Send(0x285, (uint32_t *)bytes, 8);
-    }
+  if (DualCan) {
+    can2->Send(0x285, (uint32_t *)bytes, 8);
   }
+  // }
 }
 
 void OutlanderHeartBeat::SetPullInEVSE(bool pullInEVSE) {
