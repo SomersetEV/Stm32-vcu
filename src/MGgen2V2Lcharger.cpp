@@ -170,30 +170,76 @@ void MGgen2V2Lcharger::Task100Ms() {
     dcDcCounter++;
     can->Send(0x19C, (uint32_t *)bytes, 8);
 
-    // --- 0x297: BMS state — two versions required by charger ---
-    // Simple version (HCU/VCU side). D2=0x03 = driving/V2L mode throughout.
+    // --- 0x08E: V2L enable keepalive ---
+    // D1..D6 constant across all 3091 frames of the MG ZS V2L log.
+    // D7 = rolling 4-bit counter, D8 = XOR(D1..D7).
+    bytes[0] = 0x80;
+    bytes[1] = 0x04;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+    bytes[4] = 0x13;
+    bytes[5] = 0x88;
+    bytes[6] = v2lCounter & 0x0F;
+    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
+    v2lCounter++;
+    can->Send(0x08E, (uint32_t *)bytes, 8);
+
+    // --- V2L phase sequencing (V2Ltimer ticks at 100ms) ---
+    // Mirrors the MG ZS log ordering, compressed. Tune the boundaries below.
+    //   A  0-19   D2=0x01 standby      33F=0x00   29C=idle
+    //   B 20-24   D2=0x21 V2L REQUEST  33F=0x06   29C=cleared
+    //   C 25-29   D2=0x01              33F=0x46
+    //   D 30-34   D2=0x04              33F=0x46
+    //   E 35-39   D2=0x0C              33F=0x46
+    //   F 40+     D2=0x03 running      33F=0x48   29C=V2L active
+    uint8_t v2lState;   // 0x297 D2
+    uint8_t v2lD7hi;    // 0x297 D7 high nibble (state-linked in the real car)
+    if (V2Ltimer < 20)      { v2lState = 0x01; v2lD7hi = 0x90; }
+    else if (V2Ltimer < 25) { v2lState = 0x21; v2lD7hi = 0x80; }
+    else if (V2Ltimer < 30) { v2lState = 0x01; v2lD7hi = 0x90; }
+    else if (V2Ltimer < 35) { v2lState = 0x04; v2lD7hi = 0x80; }
+    else if (V2Ltimer < 40) { v2lState = 0x0C; v2lD7hi = 0x80; }
+    else                    { v2lState = 0x03; v2lD7hi = 0xB0; }
+
+    // --- 0x297: BMS state — charger needs BOTH frames ---
+    // Null frame: D2 mirrors the state, everything else zero, D8 = 0x00.
+    // Confirmed: null frames never carry the XOR checksum.
     bytes[0] = 0x00;
-    bytes[1] = 0x03;
+    bytes[1] = v2lState;
     bytes[2] = 0x00;
     bytes[3] = 0x00;
     bytes[4] = 0x00;
     bytes[5] = 0x00;
-    bytes[6] = 0x20;
-    bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6]; // 0x23
+    bytes[6] = (v2lState == 0x03) ? 0x20 : 0x00;
+    bytes[7] = 0x00; // NOT the XOR — real null frames are always 0x00 here
     can->Send(0x297, (uint32_t *)bytes, 8);
 
-    // Full BMS version (bus-3 style) — working V2L log shows the charger
-    // requires this second format to enable V2L output.
-    // D1=0x01, D3=0xE0, D5=0xC3; D7 free-running counter; D8 = XOR(D1..D7).
+    // Full frame: D3=0xE0 data-valid, D5/D6=0xFF/0xFF in every state,
+    // D7 = state-linked high nibble + rolling counter, D8 = XOR(D1..D7).
     bytes[0] = 0x01;
-    bytes[1] = 0x03;
+    bytes[1] = v2lState;
     bytes[2] = 0xE0;
     bytes[3] = 0x00;
-    bytes[4] = 0xC3;
-    bytes[5] = 0x0C;
-    bytes[6] = v2lHeartbeat++;
+    bytes[4] = 0xFF;
+    bytes[5] = 0xFF;
+    bytes[6] = v2lD7hi | (v2lHeartbeat & 0x0F);
     bytes[7] = bytes[0]^bytes[1]^bytes[2]^bytes[3]^bytes[4]^bytes[5]^bytes[6];
+    v2lHeartbeat++;
     can->Send(0x297, (uint32_t *)bytes, 8);
+
+    // --- 0x29C: discharge limits — steps in sync with 0x33F ---
+    bytes[0] = 0x28;
+    if (V2Ltimer < 20) {          // idle
+      bytes[1] = 0xFF; bytes[2] = 0x83; bytes[3] = 0xFF;
+      bytes[4] = 0x00; bytes[5] = 0xFF; bytes[6] = 0x7F; bytes[7] = 0xFF;
+    } else if (V2Ltimer < 40) {   // cleared during arming
+      bytes[1] = 0x00; bytes[2] = 0x00; bytes[3] = 0x00;
+      bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00;
+    } else {                      // V2L active: 22.0A, 445.8V
+      bytes[1] = 0x89; bytes[2] = 0x04; bytes[3] = 0x00;
+      bytes[4] = 0x00; bytes[5] = 0xDC; bytes[6] = 0x57; bytes[7] = 0x12;
+    }
+    can->Send(0x29C, (uint32_t *)bytes, 8);
 
     // --- 0x1F1: wakeup keepalive ---
     bytes[0] = 0x0E;
@@ -206,12 +252,10 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[7] = 0x00;
     can->Send(0x1F1, (uint32_t *)bytes, 8);
 
-    // --- 0x33F: V2L state machine ---
-    // Phase 0 (0-2):  D8=0x00 idle
-    // Phase 1 (3-16): D8=0x46 V2L announce (300ms)
-    // Phase 2 (17+):  D8=0x48 V2L output enable
-    // 1.4s gap between 0x46 and 0x48 matches both working reference logs
-    // exactly (bench playback and minimal 3-message log).
+    // --- 0x33F: V2L output relay sequence ---
+    // 0x00 idle -> 0x06 -> 0x46 announce -> 0x48 output enable.
+    // The 0x06 step appears in the MG ZS log during the 0x297 D2=0x21
+    // request window; 0x46 follows immediately after that window closes.
     bytes[0] = 0x00;
     bytes[1] = 0x00;
     bytes[2] = 0x00;
@@ -219,9 +263,11 @@ void MGgen2V2Lcharger::Task100Ms() {
     bytes[4] = 0x28;
     bytes[5] = 0x00;
     bytes[6] = 0x00;
-    if (V2Ltimer < 3)
+    if (V2Ltimer < 22)
       bytes[7] = 0x00;
-    else if (V2Ltimer < 17)
+    else if (V2Ltimer < 25)
+      bytes[7] = 0x06;
+    else if (V2Ltimer < 40)
       bytes[7] = 0x46;
     else
       bytes[7] = 0x48;
@@ -229,13 +275,13 @@ void MGgen2V2Lcharger::Task100Ms() {
 
     // --- 0x396: Car_2_CCU — direct car/HCU to charger authorisation ---
     // DBC confirms this is a Car_2_CCU message (car sends to charger, not BMS).
-    // D5=0xC0 is the V2L-active value seen in the real MG5 hybrid log.
-    // May only need to be received once to configure/authorise V2L in charger.
+    // D5 was 0xC0, but the MG ZS V2L log only ever shows 0x00 or 0x80 here,
+    // so 0xC0 is not a value the charger expects. Using 0x00.
     bytes[0] = 0x44;
     bytes[1] = 0x6E;
     bytes[2] = 0xB4;
     bytes[3] = 0x28;
-    bytes[4] = 0xC0;
+    bytes[4] = 0x00;
     bytes[5] = 0x4E;
     bytes[6] = 0x4D;
     bytes[7] = 0x4D;
