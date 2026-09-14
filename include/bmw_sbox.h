@@ -51,10 +51,18 @@ public:
   static int32_t KWh;
   static int32_t Ah;
 
+  // BMW 2 bit status: 0=no statement, 1=not active, 2=active, 3=invalid
+  static uint8_t IsoErrExt; // 0x1FA byte0 bits0-1, external HV network
+  static uint8_t IsoErrInt; // 0x1FA byte0 bits2-3, internal HV network
+  static uint8_t IsoWarn;   // 0x1FA byte2 bits6-7, isolation warning
+  static uint8_t IsoMeas;   // 0x431 byte0 bits2-3, measurement status
+
 private:
   static void handle200(uint32_t data[2]);
   static void handle210(uint32_t data[2]);
   static void handle220(uint32_t data[2]);
+  static void handle1FA(uint32_t data[2]);
+  static void handle431(uint32_t data[2]);
 };
 
 #endif /* bmw_sbox_h */

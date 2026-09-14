@@ -267,9 +267,13 @@
   VALUE_ENTRY(DMA_TxComplete, ONOFF, 2120)                                     \
   VALUE_ENTRY(DMA_RxTimeout, "", 2121)                                         \
   VALUE_ENTRY(DMA_ConsecFail, "", 2122)                                        \
-  VALUE_ENTRY(HTM_State, "", 2123)
+  VALUE_ENTRY(HTM_State, "", 2123)                                             \
+  VALUE_ENTRY(SboxIsoExt, ISOSTAT, 2124)                                       \
+  VALUE_ENTRY(SboxIsoInt, ISOSTAT, 2125)                                       \
+  VALUE_ENTRY(SboxIsoWarn, ISOSTAT, 2126)                                      \
+  VALUE_ENTRY(SboxIsoMeas, ISOSTAT, 2127)
 
-// Next value Id: 2124
+// Next value Id: 2128
 
 // Dead params
 /*
@@ -327,6 +331,7 @@
 #define ONOFF "0=Off, 1=On, 2=na"
 #define LOWHIGH "0=LOW, 1=HIGH, 2=AUTO, 3=HIGHFWDLOWREV"
 #define OKERR "0=Error, 1=Ok, 2=na"
+#define ISOSTAT "0=NoStatement, 1=NotActive, 2=Active, 3=Invalid"
 #define CANSPEEDS "0=125k, 1=250k, 2=500k, 3=800k, 4=1M"
 #define CANIOS "1=Cruise, 2=Start, 4=Brake, 8=Fwd, 16=Rev, 32=Bms"
 #define CANPERIODS "0=100ms, 1=10ms"

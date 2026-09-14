@@ -20,6 +20,7 @@
  */
 
 #include <bmw_sbox.h>
+#include <errormessage.h>
 
 /*
  * Implements control of the contactors in the BMW PHEV battery box "SBOX" unit.
@@ -34,6 +35,11 @@ int32_t SBOX::KWh;
 int32_t SBOX::Voltage = 0;  // in mV
 int32_t SBOX::Voltage2 = 0; // in mV
 int32_t SBOX::Temperature;
+uint8_t SBOX::IsoErrExt = 0;
+uint8_t SBOX::IsoErrInt = 0;
+uint8_t SBOX::IsoWarn = 0;
+uint8_t SBOX::IsoMeas = 0;
+static uint16_t IsoMsgAge = 0; // 10ms ticks since the last 0x1FA
 uint8_t canCtr100 = 0;
 uint8_t CCByte = 0;
 uint8_t CRCByte = 0;
@@ -77,6 +83,8 @@ void SBOX::RegisterCanMessages(CanHardware *can) {
   can->RegisterUserMessage(0x200); // SBOX MSG
   can->RegisterUserMessage(0x210); // SBOX MSG
   can->RegisterUserMessage(0x220); // SBOX MSG
+  can->RegisterUserMessage(0x1FA); // BMS status 1: isolation fault flags, 1s
+  can->RegisterUserMessage(0x431); // BMS HV unit data: iso meas status, 200ms
 }
 
 void SBOX::DecodeCAN(int id, uint32_t data[2]) {
@@ -89,6 +97,12 @@ void SBOX::DecodeCAN(int id, uint32_t data[2]) {
     break;
   case 0x220:
     SBOX::handle220(data); // SBOX CAN MESSAGE
+    break;
+  case 0x1FA:
+    SBOX::handle1FA(data); // BMS CAN MESSAGE
+    break;
+  case 0x431:
+    SBOX::handle431(data); // BMS CAN MESSAGE
     break;
   }
 }
@@ -136,8 +150,44 @@ void SBOX::handle220(uint32_t data[2]) // SBOX Output voltage
   }
 }
 
+void SBOX::handle1FA(uint32_t data[2]) // BMS Status Of High-Voltage Battery 1
+
+{
+  uint8_t *bytes = (uint8_t *)data;
+  IsoErrExt = bytes[0] & 0x03;
+  IsoErrInt = (bytes[0] & 0x0C) >> 2;
+  IsoWarn = (bytes[2] & 0xC0) >> 6;
+  IsoMsgAge = 0;
+  Param::SetInt(Param::SboxIsoExt, IsoErrExt);
+  Param::SetInt(Param::SboxIsoInt, IsoErrInt);
+  Param::SetInt(Param::SboxIsoWarn, IsoWarn);
+  if (IsoErrExt == 2 || IsoErrInt == 2)
+    ErrorMessage::Post(ERR_SBOXISO); // display only, no contactor action here
+}
+
+void SBOX::handle431(uint32_t data[2]) // BMS Data High-Voltage Battery Unit
+
+{
+  uint8_t *bytes = (uint8_t *)data;
+  IsoMeas = (bytes[0] & 0x0C) >> 2;
+  Param::SetInt(Param::SboxIsoMeas, IsoMeas);
+}
+
 void SBOX::ControlContactors(int opmode, CanHardware *can) {
   uint8_t bytes[8];
+
+  // Do not leave a stale isolation status on display if the pack stops talking
+  if (IsoMsgAge < 300)
+    IsoMsgAge++; // 10ms ticks, 300 = 3s without a 0x1FA
+  if (IsoMsgAge == 300) {
+    IsoErrExt = 0;
+    IsoErrInt = 0;
+    IsoWarn = 0;
+    Param::SetInt(Param::SboxIsoExt, 0);
+    Param::SetInt(Param::SboxIsoInt, 0);
+    Param::SetInt(Param::SboxIsoWarn, 0);
+  }
+
   bytes[0] = 0xFF; // sems to control the iso relay
   bytes[1] = 0xFE; // needs to be 0xFE to enable contactors.
   bytes[2] = 0xFF;
