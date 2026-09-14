@@ -45,13 +45,14 @@ OBJSL		= $(BINARY).o hwinit.o stm32scheduler.o params.o terminal.o terminal_prj.
            daisychainbms.o simpbms.o outlanderCharger.o Can_OBD2.o cansdo.o sdocommands.o TeslaDCDC.o BMW_E31.o F30_Lever.o \
            CPC.o ElconCharger.o RearOutlanderinverter.o linbus.o VWCoolantHeater.o JLR_G1.o JLR_G2.o Foccci.o digipot.o\
 		   OutlanderHeartBeat.o E65_Lever.o leafbms.o V_Classic.o kangoobms.o OutlanderCanHeater.o VWAirHeater.o\
-		   MGCoolantHeater.o NissLeafMng.o preheater.o MGgen2V2Lcharger.o OutlanderCompressor.o ElconDCDC.o PWMHeater.o
+		   MGCoolantHeater.o NissLeafMng.o preheater.o MGgen2V2Lcharger.o OutlanderCompressor.o ElconDCDC.o PWMHeater.o \
+		   stwmbms.o oibms.o WebastoHVH.o InverterACP.o Maintainer12V.o PKP2300_Lever.o C5Charger.o C5DCDC.o
 
 
 
 OBJS     = $(patsubst %.o,$(OUT_DIR)/%.o, $(OBJSL))
-vpath %.c src/ libopeninv/src/
-vpath %.cpp src/ libopeninv/src/
+vpath %.c src/ src/HVAC/ src/bms/ src/chargers/ src/dcdc/ src/inverters/ src/shifters/ src/vehicles/ libopeninv/src/
+vpath %.cpp src/ src/HVAC/ src/bms/ src/chargers/ src/dcdc/ src/inverters/ src/shifters/ src/vehicles/ libopeninv/src/
 
 OPENOCD_BASE	= /usr
 OPENOCD		= $(OPENOCD_BASE)/bin/openocd

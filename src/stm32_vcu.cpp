@@ -21,90 +21,91 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "BMW_E31.h"
-#include "BMW_E39.h"
-#include "BMW_E65.h"
 #include "CANSPI.h"
-#include "CPC.h"
 #include "Can_OBD2.h"
-#include "Can_OI.h"
-#include "Can_VAG.h"
-#include "E65_Lever.h"
-#include "ElconCharger.h"
-#include "ElconDCDC.h"
-#include "F30_Lever.h"
-#include "Foccci.h"
-#include "GS450H.h"
-#include "JLR_G1.h"
-#include "JLR_G2.h"
-#include "MGCoolantHeater.h"
-#include "MGgen2V2Lcharger.h"
-#include "NissanPDM.h"
-#include "NoInverter.h"
-#include "NoVehicle.h"
-#include "OutlanderCanHeater.h"
-#include "OutlanderCompressor.h"
-#include "OutlanderHeartBeat.h"
-#include "PWMHeater.h"
-#include "TeslaDCDC.h"
-#include "VWAirHeater.h"
-#include "VWCoolantHeater.h"
-#include "V_Classic.h"
-#include "amperacharger.h"
-#include "amperaheater.h"
+#include "HVAC/MGCoolantHeater.h"
+#include "HVAC/OutlanderCanHeater.h"
+#include "HVAC/OutlanderCompressor.h"
+#include "HVAC/PWMHeater.h"
+#include "HVAC/VWAirHeater.h"
+#include "HVAC/VWCoolantHeater.h"
+#include "HVAC/WebastoHVH.h"
+#include "HVAC/amperaheater.h"
+#include "HVAC/compressor.h"
+#include "HVAC/heater.h"
+#include "HVAC/preheater.h"
 #include "anain.h"
-#include "bms.h"
+#include "bms/bms.h"
+#include "bms/daisychainbms.h"
+#include "bms/kangoobms.h"
+#include "bms/leafbms.h"
+#include "bms/oibms.h"
+#include "bms/simpbms.h"
+#include "bms/stwmbms.h"
 #include "bmw_sbox.h"
 #include "canmap.h"
 #include "cansdo.h"
-#include "chademo.h"
-#include "chargerhw.h"
-#include "chargerint.h"
-#include "compressor.h"
-#include "daisychainbms.h"
-#include "dcdc.h"
+#include "chargers/C5Charger.h"
+#include "chargers/CPC.h"
+#include "chargers/ElconCharger.h"
+#include "chargers/Foccci.h"
+#include "chargers/MGgen2V2Lcharger.h"
+#include "chargers/NissanPDM.h"
+#include "chargers/OutlanderHeartBeat.h"
+#include "chargers/amperacharger.h"
+#include "chargers/chademo.h"
+#include "chargers/chargerhw.h"
+#include "chargers/chargerint.h"
+#include "chargers/extCharger.h"
+#include "chargers/outlanderCharger.h"
+#include "chargers/teslaCharger.h"
+#include "dcdc/C5DCDC.h"
+#include "dcdc/ElconDCDC.h"
+#include "dcdc/Maintainer12V.h"
+#include "dcdc/TeslaDCDC.h"
+#include "dcdc/dcdc.h"
 #include "digio.h"
 #include "digipot.h"
 #include "errormessage.h"
-#include "extCharger.h"
-#include "heater.h"
 #include "hwdefs.h"
 #include "hwinit.h"
-#include "i3LIM.h"
-#include "inverter.h"
+#include "inverters/Can_OI.h"
+#include "inverters/GS450H.h"
+#include "inverters/InverterACP.h"
+#include "inverters/i3LIM.h"
+#include "inverters/inverter.h"
+#include "inverters/leafinv.h"
+#include "inverters/outlanderinverter.h"
+#include "inverters/rearoutlanderinverter.h"
 #include "iomatrix.h"
 #include "isa_shunt.h"
-#include "kangoobms.h"
-#include "leafbms.h"
-#include "leafinv.h"
 #include "linbus.h"
 #include "my_math.h"
-#include "noCompressor.h"
-#include "noHeater.h"
-#include "no_Lever.h"
-#include "nocharger.h"
 #include "notused.h"
-#include "outlanderCharger.h"
-#include "outlanderinverter.h"
 #include "param_save.h"
 #include "params.h"
-#include "preheater.h"
 #include "printf.h"
-#include "rearoutlanderinverter.h"
-#include "sdocommands.h"
-#include "shifter.h"
-#include "simpbms.h"
+#include "shifters/E65_Lever.h"
+#include "shifters/F30_Lever.h"
+#include "shifters/JLR_G1.h"
+#include "shifters/JLR_G2.h"
+#include "shifters/PKP2300_Lever.h"
+#include "shifters/shifter.h"
 #include "stm32_can.h"
 #include "stm32scheduler.h"
-#include "subaruvehicle.h"
 #include "temp_meas.h"
 #include "terminal.h"
 #include "terminalcommands.h"
-#include "teslaCharger.h"
 #include "throttle.h"
 #include "utils.h"
 #include "vag_sbox.h"
-#include "vehicle.h"
+#include "vehicles/BMW_E31.h"
+#include "vehicles/BMW_E39.h"
+#include "vehicles/BMW_E65.h"
+#include "vehicles/Can_VAG.h"
+#include "vehicles/V_Classic.h"
+#include "vehicles/subaruvehicle.h"
+#include "vehicles/vehicle.h"
 #include <libopencm3/stm32/can.h>
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/iwdg.h>
@@ -166,56 +167,57 @@ static NissanPDM chargerPDM;
 static teslaCharger ChargerTesla;
 static ElconCharger ChargerElcon;
 static notused UnUsed;
-static noCharger nochg;
 static extCharger chgdigi;
 static amperaCharger ampChg;
 static outlanderCharger outChg;
 static MGgen2V2Lcharger MGgen2v2l;
+static C5Charger c5Chg;
 static FCChademo chademoFC;
 static i3LIMClass LIMFC;
 static CPCClass CPCcan;
 static FoccciClass Focccican;
 static Can_OI openInv;
-static NoInverterClass NoInverter;
+static InverterACP inverterAcp;
 static OutlanderInverter outlanderInv;
-static noHeater Heaternone;
 static AmperaHeater amperaHeater;
+static WebastoHVH webastoHeater;
 static OutlanderCanHeater outlanderCanHeater;
-static no_Lever NoGearLever;
 static F30_Lever F30GearLever;
 static E65_Lever E65GearLever;
 static JLR_G1 JLRG1shift;
 static JLR_G2 JLRG2shift;
+static PKP2300_Lever PKP2300GearPanel;
 static vwCoolantHeater heaterCoolantVW;
 static mgCoolantHeater heaterCoolantMG;
 static vwAirHeater heaterAirVW;
-static NoVehicle VehicleNone;
 static V_Classic classVehicle;
-static Inverter *selectedInverter = &openInv;
-static Vehicle *selectedVehicle = &VehicleNone;
-static Heater *selectedHeater = &Heaternone;
+static Inverter *selectedInverter = &UnUsed;
+static Vehicle *selectedVehicle = &UnUsed;
+static Heater *selectedHeater = &UnUsed;
 static Chargerhw *selectedCharger = &chargerPDM;
 static Chargerint *selectedChargeInt = &UnUsed;
-static Shifter *selectedShifter = &NoGearLever;
-static BMS BMSnone;
+static Shifter *selectedShifter = &UnUsed;
 static SimpBMS BMSsimp;
+static OIBMS flyingAdcBms;
 static LeafBMS BMSleaf;
 static DaisychainBMS BMSdaisychain;
 static KangooBMS BMSRenaultKangoo33;
+static STWmBMS stwBms;
 static DCDC DCDCnone;
 static TeslaDCDC DCDCTesla;
 static ElconDCDC ElconDC;
-static BMS *selectedBMS = &BMSnone;
+static C5DCDC C5DC;
+static BMS *selectedBMS = &UnUsed;
 static DCDC *selectedDCDC = &DCDCnone;
 static Can_OBD2 canOBD2;
 static Shifter shifterNone;
 static RearOutlanderInverter rearoutlanderInv;
 static LinBus *lin;
 static Preheater preheater;
-static NoCompressor CompressorNone;
 static OutlanderCompressor outlanderCompressor;
-static Compressor *selectedCompressor = &CompressorNone;
+static Compressor *selectedCompressor = &UnUsed;
 static PWMHeater pwmHeater;
+static Maintainer12V maintainer12V;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void Ms200Task(void) {
@@ -377,6 +379,7 @@ static void Ms200Task(void) {
     IOMatrix::GetPin(IOMatrix::BRAKEVACPUMP)->Clear();
   }
 
+  maintainer12V.Task200Ms(opmode);
   preheater.Task200Ms(opmode, hours, minutes);
 }
 
@@ -596,9 +599,10 @@ static void ControlCabHeater(int opmode) {
   // preheat What about charge mode and timer mode?
   if ((opmode == MOD_RUN && Param::GetInt(Param::Control) >= 1) ||
       opmode == MOD_PREHEAT) {
-    IOMatrix::GetPin(IOMatrix::HEATERENABLE)
-        ->Set(); // Heater enable and coolant pump on
-    selectedHeater->SetTargetTemperature(50); // TODO: Currently does nothing
+    // Heater enable and coolant pump on
+    IOMatrix::GetPin(IOMatrix::HEATERENABLE)->Set();
+    // TODO: Currently does nothing except on WebastoHVH
+    selectedHeater->SetTargetTemperature(60);
     selectedHeater->SetPower(Param::GetInt(Param::HeatPwr),
                              Param::GetBool(Param::HeatReq));
   } else {
@@ -712,6 +716,7 @@ static void Ms10Task(void) {
     initbyStart = false;
     initbyCharge = false;
     preheater.SetInitByPreHeat(false);
+    maintainer12V.SetInitByMaintainer(false);
 
     DigIo::inv_out.Clear();                           // inverter power off
     IOMatrix::GetPin(IOMatrix::COOLANTPUMP)->Clear(); // Coolant pump off if
@@ -759,6 +764,12 @@ static void Ms10Task(void) {
       vehicleStartTime = rtc_get_counter_val();
       preheater.SetInitByPreHeat(true);
     }
+    if (maintainer12V.GetRunMaintainer()) {
+      opmode = MOD_PRECHARGE; // proceed to precharge if charge requested.
+      rlyDly = 25;            // Recharge sequence timer
+      vehicleStartTime = rtc_get_counter_val();
+      maintainer12V.SetInitByMaintainer(true);
+    }
     Param::SetInt(Param::opmode, opmode);
     break;
 
@@ -800,6 +811,12 @@ static void Ms10Task(void) {
         opmode = MOD_PREHEAT;
         rlyDly = 25;                         // Recharge sequence timer
         Param::SetInt(Param::TorqDerate, 0); // clear torque derate reason
+      } else if (maintainer12V.GetRunMaintainer()) {
+        opmode = MOD_MAINTAIN;
+        rlyDly = 25;                         // Recharge sequence timer
+        Param::SetInt(Param::TorqDerate, 0); // clear torque derate reason
+        Param::SetInt(Param::maintainWakeups,
+                      Param::GetInt(Param::maintainWakeups) + 1);
       }
     }
     if (initbyCharge && !chargeMode)
@@ -808,6 +825,9 @@ static void Ms10Task(void) {
     if (initbyStart && !selectedVehicle->Ready())
       opmode = MOD_OFF;
     if (preheater.GetInitByPreHeat() && !preheater.GetRunPreHeat())
+      opmode = MOD_OFF;
+    if (maintainer12V.GetInitByMaintainer() &&
+        !maintainer12V.GetRunMaintainer())
       opmode = MOD_OFF;
 
     if (udc < (Param::GetInt(Param::udcsw)) &&
@@ -864,6 +884,26 @@ static void Ms10Task(void) {
     Param::SetInt(Param::opmode, opmode);
     break;
 
+  case MOD_MAINTAIN:
+    if (rlyDly != 0)
+      rlyDly--; // here we are going to pause before energising precharge to
+                // prevent too many contactors pulling amps at the same time
+    if (rlyDly == 0) {
+      DigIo::dcsw_out.Set();
+    }
+
+    maintainer12V.Ms10Task();
+
+    if (!maintainer12V.GetRunMaintainer()) {
+      rlyDly = 250; // Recharge sequence timer for delayed shutdown
+    }
+
+    if ((selectedVehicle->Start() && selectedVehicle->Ready())) {
+      maintainer12V.CancelMaintainer();
+    }
+
+    break;
+
   case MOD_PREHEAT:
     if (rlyDly != 0)
       rlyDly--; // here we are going to pause before energising precharge to
@@ -905,7 +945,7 @@ static void UpdateInv() {
   selectedInverter->DeInit();
   switch (Param::GetInt(Param::Inverter)) {
   case InvModes::NoInv:
-    selectedInverter = &NoInverter;
+    selectedInverter = &UnUsed;
     break;
   case InvModes::Leaf_Gen1:
     selectedInverter = &leafInv;
@@ -933,6 +973,9 @@ static void UpdateInv() {
     selectedInverter = &rearoutlanderInv;
     OutlanderCAN = true;
     break;
+  case InvModes::ACPropulsion:
+    selectedInverter = &inverterAcp;
+    break;
   }
   // This will call SetCanFilters() via the Clear Callback
   canInterface[0]->ClearUserMessages();
@@ -942,7 +985,7 @@ static void UpdateInv() {
 static void UpdateVehicle() {
   switch (Param::GetInt(Param::Vehicle)) {
   case vehicles::None:
-    selectedVehicle = &VehicleNone;
+    selectedVehicle = &UnUsed;
     break;
   case vehicles::vBMW_E39:
     selectedVehicle = &e39Vehicle;
@@ -978,7 +1021,7 @@ static void UpdateCharger() {
   switch (Param::GetInt(Param::chargemodes)) {
   case ChargeModes::Off:
     chargeMode = false;
-    selectedCharger = &nochg;
+    selectedCharger = &UnUsed;
     break;
   case ChargeModes::EXT_DIGI:
     selectedCharger = &chgdigi;
@@ -1001,6 +1044,9 @@ static void UpdateCharger() {
     break;
   case ChargeModes::MGgen2:
     selectedCharger = &MGgen2v2l;
+    break;
+  case ChargeModes::C5_PTECAN:
+    selectedCharger = &c5Chg;
     break;
   }
   // This will call SetCanFilters() via the Clear Callback
@@ -1036,7 +1082,7 @@ static void UpdateHeater() {
   selectedHeater->DeInit();
   switch (Param::GetInt(Param::Heater)) {
   case HeatType::Noheater:
-    selectedHeater = &Heaternone;
+    selectedHeater = &UnUsed;
     break;
   case HeatType::AmpHeater:
     selectedHeater = &amperaHeater;
@@ -1058,6 +1104,16 @@ static void UpdateHeater() {
     break;
   case HeatType::PWM:
     selectedHeater = &pwmHeater;
+    break;
+  case HeatType::HVH50:
+    selectedHeater = &webastoHeater;
+    webastoHeater.SetLinInterface(lin);
+    webastoHeater.SetSubtype(WebastoHVH::HVH50);
+    break;
+  case HeatType::HVH100:
+    selectedHeater = &webastoHeater;
+    webastoHeater.SetLinInterface(lin);
+    webastoHeater.SetSubtype(WebastoHVH::HVH100);
     break;
   }
   // This will call SetCanFilters() via the Clear Callback
@@ -1081,9 +1137,15 @@ static void UpdateBMS() {
   case BMSModes::BMSRenaultKangoo33BMS:
     selectedBMS = &BMSRenaultKangoo33;
     break;
+  case BMSModes::BMSSTW:
+    selectedBMS = &stwBms;
+    break;
+  case BMSModes::BMSOIFlyingAdc:
+    selectedBMS = &flyingAdcBms;
+    break;
   default:
     // Default to no BMS
-    selectedBMS = &BMSnone;
+    selectedBMS = &UnUsed;
     break;
   }
   // This will call SetCanFilters() via the Clear Callback
@@ -1106,6 +1168,10 @@ static void UpdateDCDC() {
     selectedDCDC = &ElconDC;
     break;
 
+  case DCDCModes::DCDCC5:
+    selectedDCDC = &C5DC;
+    break;
+
   default:
     // Default to no DCDC
     selectedDCDC = &DCDCnone;
@@ -1119,7 +1185,7 @@ static void UpdateDCDC() {
 static void UpdateCompressor() {
   switch (Param::GetInt(Param::Compressor)) {
   case CompressorOptions::NoCompress:
-    selectedCompressor = &CompressorNone;
+    selectedCompressor = &UnUsed;
     break;
   case CompressorOptions::OutlanderCompress:
     selectedCompressor = &outlanderCompressor;
@@ -1153,6 +1219,10 @@ static void UpdateShifter() {
 
   case ShifterModes::BMWE65:
     selectedShifter = &E65GearLever;
+    break;
+
+  case ShifterModes::PKP2300:
+    selectedShifter = &PKP2300GearPanel;
     break;
 
   default:
@@ -1264,12 +1334,9 @@ void Param::Change(Param::PARAM_NUM paramNum) {
     break;
   }
 
-  if (Param::GetInt(Param::reversemotor) != 0) {
-    if (Param::GetInt(Param::Inverter) == InvModes::RearOutlander) {
-
-    } else {
-      Param::SetInt(Param::reversemotor, 0);
-    }
+  if (Param::GetInt(Param::reversemotor) != 0 &&
+      !selectedInverter->SupportsReverseMotor()) {
+    Param::SetInt(Param::reversemotor, 0);
   }
 
   Throttle::potmin[0] = Param::GetInt(Param::potmin);
@@ -1320,6 +1387,7 @@ void Param::Change(Param::PARAM_NUM paramNum) {
   IOMatrix::AssignFromParams();
   IOMatrix::AssignFromParamsAnalogue();
 
+  maintainer12V.ParamsChange();
   preheater.ParamsChange();
 }
 
@@ -1440,7 +1508,6 @@ int main(void) {
   c.AddCallback(&cb);
   c2.AddCallback(&cb);
   TerminalCommands::SetCanMap(&cm);
-  SdoCommands::SetCanMap(&cm);
   canMap = &cm;
   canSdo = &sdo;
 
@@ -1481,15 +1548,11 @@ int main(void) {
 
   while (1) {
     char c = 0;
-    CanSdo::SdoFrame *sdoFrame = sdo.GetPendingUserspaceSdo();
     t.Run();
+    // SDO requests are serviced inside CanSdo (from CanSdo::HandleRx); the loop
+    // only drives the terminal and the JSON param dump.
     if (sdo.GetPrintRequest() == PRINT_JSON) {
       TerminalCommands::PrintParamsJson(&sdo, &c);
-    }
-    if (0 != sdoFrame) {
-      SdoCommands::ProcessStandardCommands(sdoFrame);
-
-      sdo.SendSdoReply(sdoFrame);
     }
   }
 
