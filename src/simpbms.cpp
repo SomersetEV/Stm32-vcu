@@ -60,8 +60,9 @@ bool SimpBMS::ChargeAllowed() {
   if (minTempC < Param::GetFloat(Param::BMS_TminLimit))
     return false;
 
-  // Refuse to charge if the current limit is zero.
-  if (chargeCurrentLimit < 0.5)
+  // Refuse to charge if the current limit is zero. Limit is in 0.1A digits, so
+  // 5 digits is 0.5A.
+  if (chargeCurrentLimit < 5)
     return false;
 
   // Otherwise, charging is permitted.
@@ -72,7 +73,7 @@ bool SimpBMS::ChargeAllowed() {
 float SimpBMS::MaxChargeCurrent() {
   if (!ChargeAllowed())
     return 0;
-  return chargeCurrentLimit;
+  return chargeCurrentLimit * 0.1;
 }
 
 // Return the maximum discharge current allowed by the BMS.
@@ -83,15 +84,12 @@ float SimpBMS::MaxDischargeCurrent() {
   // limits alone rather than cutting drive power.
   if (!BMSDataValid())
     return 0;
-  return dischargeCurrentLimit;
+  return dischargeCurrentLimit * 0.1;
 }
 
 // Process voltage and temperature message from SimpBMS.
 void SimpBMS::DecodeCAN(int id, uint8_t *data) {
   if (id == 0x373) {
-    // Reset timeout counter to the full timeout value
-    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
-
     int minCell = data[0] | (data[1] << 8);
     int maxCell = data[2] | (data[3] << 8);
     int minTemp = data[4] | (data[5] << 8);
@@ -102,14 +100,14 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
     minTempC = minTemp - 273;
     maxTempC = maxTemp - 273;
 
-    // Reset timeout counter to the full timeout value
-
   } else if (id == 0x351) {
-    // CCL and DCL both come in 0.1A scale; stored here in amps.
-    chargeCurrentLimit = (data[2] | (data[3] << 8)) * 0.1;
-    dischargeCurrentLimit = (data[4] | (data[5] << 8)) * 0.1;
+    chargeCurrentLimit = data[2] | (data[3] << 8);    // CCL, 0.1A per digit
+    dischargeCurrentLimit = data[4] | (data[5] << 8); // DCL, 0.1A per digit
+    // Reset timeout counter to the full timeout value. The Orion in this setup
+    // does not send 0x373, so the reset has to hang off a frame it does send.
+    timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
   } else if (id == 0x356) {
-    batteryVoltage = (data[0] | (data[1] << 8)) * 0.01; // comes in 0.01V scale
+    batteryVoltage = (data[0] | (data[1] << 8)) * 0.1; // comes in 0.1V scale
 
     int16_t rawCurrent = (int16_t)(data[2] | (data[3] << 8));
     current = rawCurrent * 0.1f; // comes in 0.1A scale
@@ -128,16 +126,29 @@ void SimpBMS::Task100Ms() {
   Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
   Param::SetInt(Param::BMS_DischargeLim, MaxDischargeCurrent());
 
-  // Apply the BMS current limits to the drive current limits.
   if (BMSDataValid()) {
+    Param::SetFloat(Param::BMS_Vmin, minCellV);
+    Param::SetFloat(Param::BMS_Vmax, maxCellV);
+    Param::SetFloat(Param::BMS_Tmin, minTempC);
+    Param::SetFloat(Param::BMS_Tmax, maxTempC);
+
+    // Apply the BMS current limits to the drive current limits.
+    // idcmax is the positive (discharge) limit and so takes the DCL, idcmin
+    // the negative (regen, which charges the pack) limit and so takes the CCL.
+    // IdcLimitCommand is fed ABS(idc) and picks its branch from the sign of the
+    // torque request, so this mapping holds regardless of the sign convention
+    // used for idc itself. Both limits arrive at 0.1A per digit and need
+    // scaling. Only written while the BMS is actually talking - on a timeout we
+    // do nothing here and the user configured limits stay in force, so a CAN
+    // dropout cannot cut drive.
     Param::SetFloat(Param::idcmax, MIN(dischargeCurrentLimit * 0.1f, 5000.0f));
     Param::SetFloat(Param::idcmin, MAX(-chargeCurrentLimit * 0.1f, -5000.0f));
+  } else {
+    Param::SetFloat(Param::BMS_Vmin, 0);
+    Param::SetFloat(Param::BMS_Vmax, 0);
+    Param::SetFloat(Param::BMS_Tmin, 0);
+    Param::SetFloat(Param::BMS_Tmax, 0);
   }
-
-  Param::SetFloat(Param::BMS_Vmin, minCellV);
-  Param::SetFloat(Param::BMS_Vmax, maxCellV);
-  Param::SetFloat(Param::BMS_Tmin, minTempC);
-  Param::SetFloat(Param::BMS_Tmax, maxTempC);
 
   if (Param::GetInt(Param::ShuntType) == 0) // No Shunt Used
   {

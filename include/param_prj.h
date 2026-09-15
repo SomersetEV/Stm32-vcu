@@ -19,7 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define VER 2.40A
+#define VER 2.41.A
 
 /* Entries must be ordered as follows:
    1. Saveable parameters (id != 0)
@@ -117,7 +117,7 @@
   PARAM_ENTRY(CAT_HEATER, Control, HTCTRL, 0, 2, 0, 58)                        \
   PARAM_ENTRY(CAT_HEATER, HeatPwr, "W", 0, 6500, 0, 59)                        \
   PARAM_ENTRY(CAT_HEATER, HeatPercnt, "%", 0, 100, 0, 124)                     \
-  PARAM_ENTRY(CAT_HEATER, HeatPotDir, ABOVEBELOW, 0, 4, 0, 150)                \
+  PARAM_ENTRY(CAT_HEATER, HeatPotDir, ABOVEBELOW, 0, 3, 0, 150)                \
   PARAM_ENTRY(CAT_HEATER, HeatPotOn, "dig", 0, 4095, 0, 151)                   \
   PARAM_ENTRY(CAT_HEATER, HeatPotFull, "dig", 0, 4095, 0, 152)                 \
   PARAM_ENTRY(CAT_CLOCK, Set_Day, DOW, 0, 6, 0, 46)                            \

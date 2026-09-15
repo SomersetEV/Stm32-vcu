@@ -35,10 +35,9 @@ public:
 private:
   bool BMSDataValid();
   bool ChargeAllowed();
-  // CCL and DCL are sent by Simp as 0.1A per digit and scaled to amps on
-  // decode, so both of these are stored in amps.
-  float chargeCurrentLimit = 0;
-  float dischargeCurrentLimit = 0;
+  // CCL and DCL are sent by Simp as 0.1A per digit and stored the same way.
+  int chargeCurrentLimit = 0;
+  int dischargeCurrentLimit = 0;
   int timeoutCounter = 0;
   float minCellV = 0;
   float maxCellV = 0;
