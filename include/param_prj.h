@@ -63,8 +63,8 @@
   PARAM_ENTRY(CAT_THROTTLE, regenramp, "%/10ms", 0.1, 100, 1, 68)              \
   PARAM_ENTRY(CAT_THROTTLE, potmode, POTMODES, 0, 1, 0, 11)                    \
   PARAM_ENTRY(CAT_THROTTLE, dirmode, DIRMODES, 0, 4, 1, 12)                    \
-  PARAM_ENTRY(CAT_THROTTLE, DirChange, DIRLIM, 0, 2, 0, 147)                   \
-  PARAM_ENTRY(CAT_THROTTLE, DirChangeRpm, "rpm", 0, 20000, 500, 139)           \
+  PARAM_ENTRY(CAT_THROTTLE, DirChange, DIRLIM, 0, 2, 2, 147)                   \
+  PARAM_ENTRY(CAT_THROTTLE, DirChangeRpm, "rpm", 0, 20000, 50, 139)            \
   PARAM_ENTRY(CAT_THROTTLE, reversemotor, ONOFF, 0, 1, 0, 127)                 \
   PARAM_ENTRY(CAT_THROTTLE, throtramp, "%/10ms", 0.1, 100, 10, 13)             \
   PARAM_ENTRY(CAT_THROTTLE, throtramprpm, "rpm", 0, 20000, 20000, 14)          \

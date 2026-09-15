@@ -189,7 +189,9 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
   Shifter::Sgear gearS;
   int8_t selectedDir = Param::GetInt(Param::dir);
   int8_t userDirSelection = 0;
-  int8_t prevValidDir = 0;
+  // Persists across calls so the "returning to the direction we were in before
+  // neutral" check below actually has a previous direction to compare against.
+  static int8_t prevValidDir = 0;
   int8_t dirSign = (Param::GetInt(Param::dirmode) & DIR_REVERSED) ? -1 : 1;
   uint8_t ChangeLim =
       Param::GetInt(Param::DirChange); //"0=None, 1=Speed Thres, 2=Speed+Brake"
@@ -277,8 +279,9 @@ void SelectDirection(Vehicle *vehicle, Shifter *shifter) {
     {
       selectedDir = userDirSelection; // direct pass through
     } else if (ChangeLim == 1 ||
-               2) // speed limit only when changing F to R or R to F, note
-                  // last selected direction is valid,ignore neautral
+               ChangeLim == 2) // speed limit only when changing F to R or R to
+                               // F, note last selected direction is valid,
+                               // ignore neautral
     {
       if (userDirSelection != 0 &&
           userDirSelection !=
