@@ -157,6 +157,9 @@ void SimpBMS::Task100Ms() {
 
     if (BMSDataValid()) {
       Param::SetFloat(Param::idc, current);
+      // Only safe to take SOC from the BMS here. With a shunt fitted
+      // utils::CalcSOC() owns SOC and the two would fight each other.
+      Param::SetFloat(Param::SOC, stateOfCharge);
     } else {
       Param::SetFloat(Param::idc, 0);
       Param::SetFloat(Param::udcsw, 1000);
