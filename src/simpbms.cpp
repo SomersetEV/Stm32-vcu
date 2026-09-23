@@ -110,7 +110,9 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
     batteryVoltage = (data[0] | (data[1] << 8)) * 0.1; // comes in 0.1V scale
 
     int16_t rawCurrent = (int16_t)(data[2] | (data[3] << 8));
-    current = rawCurrent * 0.1f; // comes in 0.1A scale
+    // comes in 0.1A scale. Negated as the Orion reports current with the
+    // opposite sign convention to the one idc uses.
+    current = -rawCurrent * 0.1f;
 
   } else if (id == 0x355) {
     stateOfCharge = data[0] | (data[1] << 8); // comes in 1% scale
