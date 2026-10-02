@@ -169,9 +169,9 @@ private:
                               // Incompatable 3=DC Charge not possible
   uint8_t HVLM_Status_LED;    // Status of the charging LED: 0=Colour1-off,
                               // 1=Colour2-White, 2=Colour3-Yellow,
-                           // 3=Colour4-Green, 4=Colour5-Red, 5=Yellow Pulsing,
-                           // 6=Green Pulsing, 7=Red Pulsing, 8=Green/Red
-                           // Pulsing, 9=Green Flashing, 14=Init, 15=Error
+  // 3=Colour4-Green, 4=Colour5-Red, 5=Yellow Pulsing,
+  // 6=Green Pulsing, 7=Red Pulsing, 8=Green/Red
+  // Pulsing, 9=Green Flashing, 14=Init, 15=Error
   uint8_t HVLM_MaxCurrent_AC; // Maximum permissible current on the primary side
                               // (AC)
   bool HVLM_LG_ChargerTargetMode; // AC charger target mode: 0=Standby, 1=Mains
