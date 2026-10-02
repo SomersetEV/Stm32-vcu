@@ -31,6 +31,13 @@ public:
   virtual void Task10Ms() {};
   virtual void Task100Ms() {};
   virtual void SetCanInterface(CanHardware *c) { can = c; }
+  // True if the converter precharges the HV link instead of the precharge
+  // resistor
+  virtual bool DoesPrecharge() { return false; }
+  // Extra condition for leaving precharge, on top of udc >= udcsw
+  virtual bool PrechargeDone() { return true; }
+  // True if precharge has to be aborted, e.g. a load on the HV link
+  virtual bool PrechargeFault() { return false; }
 
 protected:
   CanHardware *can;

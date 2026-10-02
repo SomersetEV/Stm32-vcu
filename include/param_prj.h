@@ -104,7 +104,7 @@
   PARAM_ENTRY(CAT_CHARGER, ChgAcVolt, "Vac", 0, 250, 240, 120)                 \
   PARAM_ENTRY(CAT_CHARGER, ChgEff, "%", 0, 100, 90, 121)                       \
   PARAM_ENTRY(CAT_CHARGER, ConfigFoccci, ONOFF, 0, 1, 0, 133)                  \
-  PARAM_ENTRY(CAT_DCDC, DCdc_Type, DCDCTYPES, 0, 3, 0, 105)                    \
+  PARAM_ENTRY(CAT_DCDC, DCdc_Type, DCDCTYPES, 0, 4, 0, 105)                    \
   PARAM_ENTRY(CAT_DCDC, DCSetPnt, "V", 9, 15, 14, 106)                         \
   PARAM_ENTRY(CAT_BMS, BMS_Timeout, "sec", 1, 120, 10, 91)                     \
   PARAM_ENTRY(CAT_BMS, BMS_VminLimit, "V", 0, 10, 3.0, 92)                     \
@@ -252,6 +252,10 @@
   VALUE_ENTRY(ChgT, "M", 2090)                                                 \
   VALUE_ENTRY(U12V, "V", 2070)                                                 \
   VALUE_ENTRY(I12V, "A", 2083)                                                 \
+  VALUE_ENTRY(DCDCMode, DCDCMODES, 2126)                                       \
+  VALUE_ENTRY(DCDCUhv, "V", 2127)                                              \
+  VALUE_ENTRY(DCDCIhv, "A", 2129)                                              \
+  VALUE_ENTRY(DCDCTemp, "°C", 2128)                                            \
   VALUE_ENTRY(ChgTemp, "°C", 2078)                                             \
   VALUE_ENTRY(AC_Volts, "V", 2079)                                             \
   VALUE_ENTRY(AC_Amps, "A", 2089)                                              \
@@ -337,7 +341,9 @@
   "0=Off, 1=Run, 2=Precharge, 3=PchFail, 4=Charge, 5=12VMaintain, 6=Preheat"
 #define DOW "0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat"
 #define CHGTYPS "0=Off, 1=AC, 2=DCFC"
-#define DCDCTYPES "0=NoDCDC, 1=TeslaG2, 2=DCDCElcon, 3=DCDCC5"
+#define DCDCTYPES "0=NoDCDC, 1=TeslaG2, 2=DCDCElcon, 3=DCDCC5, 4=VW_MEB"
+#define DCDCMODES                                                              \
+  "0=Standby, 1=Precharge, 2=StepDown, 3=StepUp, 4=TestPulse, 7=Init"
 #define STATUS                                                                 \
   "0=None, 1=UdcLow, 2=UdcHigh, 4=UdcBelowUdcSw, 8=UdcLim, 16=EmcyStop, "      \
   "32=MProt, 64=PotPressed, 128=TmpHs, 256=WaitStart"
@@ -485,8 +491,8 @@ enum DCDCModes {
   NoDCDC = 0,
   TeslaG2 = 1,
   DCDCElcon = 2,
-  DCDCC5 = 3
-
+  DCDCC5 = 3,
+  VWMEB = 4
 };
 
 enum ShifterModes {

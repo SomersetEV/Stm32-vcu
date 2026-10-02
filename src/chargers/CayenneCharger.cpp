@@ -25,6 +25,8 @@
 #include "chargers/CayenneCharger.h"
 #include "errormessage.h"
 #include "iomatrix.h"
+#include "vag_crc.h"
+#include "vag_hvk.h"
 
 #define MAX_HV_CURRENT 32 // A, upper limit of the HV current request
 #define MIN_VALID_HV 50   // V, below this the HV reading is not trusted
@@ -57,20 +59,19 @@ void CayenneCharger::DeInit() {
 }
 
 void CayenneCharger::Task10Ms() {
-  msg191(); // BMS_01   0x191
+  VagHvk::Request10Ms(can); // BMS_01   0x191
 }
 
 void CayenneCharger::Task100Ms()
 
 {
   CalcValues100ms();
-  msg3C0(); //  Klemmen_Status_01
-  msg503(); // HVK_01     0x503
-  msg1A1(); // BMS_02   0x1A1
-  msg184(); // ZV_01    0x184
-  msg17B(); // FCU_02   0x17B
-  msg39D(); // BMS_03   0x39D
-  msg552(); // HVEM_05
+  VagHvk::Request100Ms(can); // Klemmen_Status_01 0x3C0, HVK_01 0x503
+  msg1A1();                  // BMS_02   0x1A1
+  msg184();                  // ZV_01    0x184
+  msg17B();                  // FCU_02   0x17B
+  msg39D();                  // BMS_03   0x39D
+  msg552();                  // HVEM_05
 }
 void CayenneCharger::Task200Ms()
 
@@ -91,24 +92,6 @@ void CayenneCharger::msg552() // HVEM_05
   bytes[6] = HVEM_05[6];
   bytes[7] = HVEM_05[7];
   can->Send(0x552, (uint32_t *)bytes, 8);
-}
-
-void CayenneCharger::msg191() // BMS_01   0x191
-{
-  uint8_t bytes[8];
-  bytes[0] = 0x00;
-  bytes[1] = (BMS_01[1] | vag_cnt191);
-  bytes[2] = BMS_01[2];
-  bytes[3] = BMS_01[3];
-  bytes[4] = BMS_01[4];
-  bytes[5] = BMS_01[5];
-  bytes[6] = BMS_01[6];
-  bytes[7] = BMS_01[7];
-  bytes[0] = vw_crc_calc(bytes, 8, 0x191);
-  can->Send(0x191, (uint32_t *)bytes, 8);
-  vag_cnt191++;
-  if (vag_cnt191 > 0x0f)
-    vag_cnt191 = 0x00;
 }
 
 void CayenneCharger::msg583() // ZV_02 200ms
@@ -150,7 +133,7 @@ void CayenneCharger::msg184() // ZV_01   0x184
   bytes[5] = ZV_01[5];
   bytes[6] = ZV_01[6];
   bytes[7] = ZV_01[7];
-  bytes[0] = vw_crc_calc(bytes, 8, 0x184);
+  VagCrc::Calc(bytes, 8, 0x184);
   can->Send(0x184, (uint32_t *)bytes, 8);
   vag_cnt184++;
   if (vag_cnt184 > 0x0f)
@@ -169,43 +152,6 @@ void CayenneCharger::msg1A1() // BMS_02   0x1A1
   bytes[6] = BMS_02[6];
   bytes[7] = BMS_02[7];
   can->Send(0x1A1, (uint32_t *)bytes, 8);
-}
-
-// Messages with CRC and counters
-void CayenneCharger::msg503() // HVK_01     0x503
-{
-  uint8_t bytes[8];
-  bytes[0] = 0x00;
-  bytes[1] = (HVK_01[1] | vag_cnt503);
-  bytes[2] = HVK_01[2];
-  bytes[3] = HVK_01[3];
-  bytes[4] = HVK_01[4];
-  bytes[5] = HVK_01[5];
-  bytes[6] = HVK_01[6];
-  bytes[7] = HVK_01[7];
-  bytes[0] = vw_crc_calc(bytes, 8, 0x503);
-  can->Send(0x503, (uint32_t *)bytes, 8);
-  vag_cnt503++;
-  if (vag_cnt503 > 0x0f)
-    vag_cnt503 = 0x00;
-}
-
-void CayenneCharger::msg3C0() // Klemmen_Status_01
-{
-  uint8_t bytes[8];
-  bytes[0] = 0x00;
-  bytes[1] = (Klemmen_Status_01[1] | vag_cnt3C0);
-  bytes[2] = Klemmen_Status_01[2];
-  bytes[3] = Klemmen_Status_01[3];
-  bytes[4] = Klemmen_Status_01[4];
-  bytes[5] = Klemmen_Status_01[5];
-  bytes[6] = Klemmen_Status_01[6];
-  bytes[7] = Klemmen_Status_01[7];
-  bytes[0] = vw_crc_calc(bytes, 8, 0x3C0);
-  can->Send(0x3C0, (uint32_t *)bytes, 8);
-  vag_cnt3C0++;
-  if (vag_cnt3C0 > 0x0f)
-    vag_cnt3C0 = 0x00;
 }
 
 void CayenneCharger::msg39D() // BMS_03   0x39D
@@ -464,15 +410,8 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
   HVEM_MaxSpannung_HV = voltSetpoint;
   BMS_Batt_Max_Volt = voltSetpoint;
 
-  // Use the VCU SoC, falling back to the previous fixed value when no SoC
-  // source is configured
-  float soc = Param::GetFloat(Param::SOC);
-  if (soc <= 0)
-    soc = 35.1f;
-  BMS_SOC_HiRes = soc * 20; // 0.05% per bit
-
   // Runtime Values:
-  BMS_Batt_Curr = (current + 2047);
+  VagHvk::bms01.BMS_Batt_Curr = (current + 2047);
 
   // BMS Limits Discharge:
   BMS_MaxDischarge_Curr = 1500;
@@ -488,23 +427,18 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
   // The charger only charges while it sees the HV system up and the BMS in AC
   // charge mode. Earlier versions always sent these values (the if statements
   // that were meant to switch them used = instead of ==), so they are kept
-  // constant here.
-  HV_Bordnetz_aktiv = true;  // Indicates an active high-voltage vehicle
-                             // electrical system: 0 = Not Active,  1 = Active
-  HVK_BMS_Sollmodus = 4;     // 4 = AC_Charging
-  HVK_MO_EmSollzustand = 50; // HvAcCh
-  HVK_DCDC_Sollmodus = 2;    // Step down
-  HVK_Gesamtst_Spgfreiheit =
-      2; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-  BMS_Batt_Volt = 400 * 4;
-  BMS_Batt_Volt_HVterm = 400 * 2;
+  // constant here. HVK_DCDC_Sollmodus is left to the DC-DC converter module.
+  VagHvk::hvk01.HV_Bordnetz_aktiv = true;
+  VagHvk::hvk01.BMS_Sollmodus = 4;        // AC_Charging
+  VagHvk::hvk01.MO_EmSollzustand = 50;    // HvAcCh
+  VagHvk::hvk01.Gesamtst_Spgfreiheit = 2; // Voltage
+  VagHvk::hvk01.HVLM_Sollmodus = clearToStart;
+  VagHvk::bms01.packVoltage = 400;
+  VagHvk::bms01.linkVoltage = 400;
   if (HVVoltage > 250) {
-    BMS_Batt_Volt = (HVVoltage) * 4;
-    BMS_Batt_Volt_HVterm = (HVVoltage) * 2;
+    VagHvk::bms01.packVoltage = HVVoltage;
+    VagHvk::bms01.linkVoltage = HVVoltage;
   }
-
-  HVK_HVLM_Sollmodus = clearToStart; // Requested target mode of the charging
-                                     // manager: 0=Not Enabled, 1=Enabled
 
   // Plug detection and EVSE current limit, when no charge interface or PP
   // input reports them
@@ -522,19 +456,6 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
     ErrorMessage::Post(ERR_CHGFAULT);
   if (LAD_ChargerWarning)
     ErrorMessage::Post(ERR_CHGWARN);
-
-  //  BMS_01
-  BMS_01[0] = 0x00;
-  BMS_01[1] = (0x00 & (0x0FU)) | ((BMS_Batt_Curr & (0x0FU)) << 4);
-  BMS_01[2] = ((BMS_Batt_Curr >> 4) & (0xFFU));
-  BMS_01[3] = (BMS_Batt_Volt & (0xFFU));
-  BMS_01[4] = ((BMS_Batt_Volt >> 8) & (0x0FU)) |
-              ((BMS_Batt_Volt_HVterm & (0x0FU)) << 4);
-  BMS_01[5] = ((BMS_Batt_Volt_HVterm >> 4) & (0x7FU)) |
-              ((BMS_SOC_HiRes & (0x01U)) << 7);
-  BMS_01[6] = ((BMS_SOC_HiRes >> 1) & (0xFFU));
-  BMS_01[7] = ((BMS_SOC_HiRes >> 9) & (0x03U)) | ((0x00 & (0x01U)) << 2) |
-              ((0x00 & (0x0FU)) << 4);
 
   //  BMS_02
   BMS_02[0] = 0x00;
@@ -581,24 +502,6 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
                ((HVEM_MaxSpannung_HV & (0x0FU)) << 4);
   HVEM_05[6] = ((HVEM_MaxSpannung_HV >> 4) & (0x3FU)) | ((0x00 & (0x03U)) << 6);
   HVEM_05[7] = 0x00;
-
-  Klemmen_Status_01[2] = (ZAS_Kl_S & (0x01U)) | ((ZAS_Kl_15 & (0x01U)) << 1) |
-                         ((ZAS_Kl_X & (0x01U)) << 2) |
-                         ((ZAS_Kl_50_Startanforderung & (0x01U)) << 3) |
-                         ((0x00 & (0x01U)) << 4) | ((0x00 & (0x01U)) << 5) |
-                         ((0x00 & (0x01U)) << 6) | ((0x00 & (0x01U)) << 7);
-
-  HVK_01[1] =
-      (0x00 & (0x0FU)) | ((0x00 & (0x01U)) << 4) | ((0x00 & (0x03U)) << 5);
-  HVK_01[2] = (HVK_MO_EmSollzustand & (0xFFU));
-  HVK_01[3] = (HVK_BMS_Sollmodus & (0x07U)) |
-              ((HVK_DCDC_Sollmodus & (0x07U)) << 3) | ((0x00 & (0x03U)) << 6);
-  HVK_01[4] = ((0x00 >> 2) & (0x01U)) | ((0x00 & (0x07U)) << 1) |
-              ((HVK_HVLM_Sollmodus & (0x07U)) << 4) | ((0x00 & (0x01U)) << 7);
-  HVK_01[5] = ((0x00 >> 1) & (0x01U)) | ((HV_Bordnetz_aktiv & (0x01U)) << 1) |
-              ((0x00 & (0x01U)) << 2) |
-              ((HVK_Gesamtst_Spgfreiheit & (0x03U)) << 3) |
-              ((0x00 & (0x01U)) << 5);
 
   ZV_01[1] = (0x00 & (0x0FU)) | ((ZV_FT_verriegeln & (0x01U)) << 4) |
              ((ZV_FT_entriegeln & (0x01U)) << 5) |

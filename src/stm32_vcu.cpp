@@ -64,6 +64,7 @@
 #include "dcdc/ElconDCDC.h"
 #include "dcdc/Maintainer12V.h"
 #include "dcdc/TeslaDCDC.h"
+#include "dcdc/VWMEBDCDC.h"
 #include "dcdc/dcdc.h"
 #include "digio.h"
 #include "digipot.h"
@@ -99,6 +100,7 @@
 #include "terminalcommands.h"
 #include "throttle.h"
 #include "utils.h"
+#include "vag_hvk.h"
 #include "vag_sbox.h"
 #include "vehicles/BMW_E31.h"
 #include "vehicles/BMW_E39.h"
@@ -117,6 +119,8 @@
 #include <stdint.h>
 
 #define PRECHARGE_TIMEOUT 5 // 5s
+// 10s, the DC-DC has to wake up and hand shake before it boosts the link
+#define DCDC_PRECHARGE_TIMEOUT 10
 
 #define PRINT_JSON 0
 
@@ -209,6 +213,7 @@ static DCDC DCDCnone;
 static TeslaDCDC DCDCTesla;
 static ElconDCDC ElconDC;
 static C5DCDC C5DC;
+static VWMEBDCDC VWMEBDC;
 static BMS *selectedBMS = &UnUsed;
 static DCDC *selectedDCDC = &DCDCnone;
 static Can_OBD2 canOBD2;
@@ -409,6 +414,7 @@ static void Ms100Task(void) {
   selectedCharger->Task100Ms();
   selectedBMS->Task100Ms();
   selectedDCDC->Task100Ms();
+  VagHvk::Task100Ms(); // after the charger and DC-DC have requested frames
   selectedShifter->Task100Ms();
   selectedHeater->Task100Ms();
   canMap->SendAll();
@@ -695,6 +701,7 @@ static void Ms10Task(void) {
   } else if (Param::GetInt(Param::chargemodes) == ChargeModes::Leaf_PDM) {
     selectedCharger->Task10Ms();
   }
+  VagHvk::Task10Ms(); // after the charger and DC-DC have requested frames
   if (opmode == MOD_RUN)
     Param::SetInt(Param::canctr,
                   (Param::GetInt(Param::canctr) + 1) &
@@ -791,14 +798,14 @@ static void Ms10Task(void) {
     if (rlyDly != 0)
       rlyDly--; // here we are going to pause before energising precharge to
                 // prevent too many contactors pulling amps at the same time
-    if (rlyDly == 0)
-      DigIo::prec_out.Set(); // commence precharge
+    if (rlyDly == 0 && !selectedDCDC->DoesPrecharge())
+      DigIo::prec_out.Set(); // commence precharge, unless the DC-DC does it
     if (prechargeMinTime != 0)
       prechargeMinTime--; // 1 second minimum precharge time
     if ((prechargeMinTime == 0) &&
-        (stt & (STAT_POTPRESSED | STAT_UDCBELOWUDCSW | STAT_UDCLIM)) ==
-            0) // Clarify operator precedence, exit precharge: time met and no
-               // faults
+        (stt & (STAT_POTPRESSED | STAT_UDCBELOWUDCSW | STAT_UDCLIM)) == 0 &&
+        selectedDCDC->PrechargeDone()) // Clarify operator precedence, exit
+                                       // precharge: time met and no faults
     {
       if (StartSig) {
         opmode = MOD_RUN;
@@ -832,10 +839,19 @@ static void Ms10Task(void) {
         !maintainer12V.GetRunMaintainer())
       opmode = MOD_OFF;
 
-    if (udc < (Param::GetInt(Param::udcsw)) &&
-        rtc_get_counter_val() > (vehicleStartTime + PRECHARGE_TIMEOUT)) {
+    if ((udc < (Param::GetInt(Param::udcsw)) ||
+         !selectedDCDC->PrechargeDone()) &&
+        rtc_get_counter_val() >
+            (vehicleStartTime + (selectedDCDC->DoesPrecharge()
+                                     ? DCDC_PRECHARGE_TIMEOUT
+                                     : PRECHARGE_TIMEOUT))) {
       DigIo::prec_out.Clear();
       ErrorMessage::Post(ERR_PRECHARGE);
+      opmode = MOD_PCHFAIL;
+    }
+    if (selectedDCDC->PrechargeFault()) {
+      DigIo::prec_out.Clear();
+      ErrorMessage::Post(ERR_PCHLOAD); // something is drawing HV current
       opmode = MOD_PCHFAIL;
     }
     Param::SetInt(Param::opmode, opmode);
@@ -1175,6 +1191,10 @@ static void UpdateDCDC() {
 
   case DCDCModes::DCDCC5:
     selectedDCDC = &C5DC;
+    break;
+
+  case DCDCModes::VWMEB:
+    selectedDCDC = &VWMEBDC;
     break;
 
   default:
