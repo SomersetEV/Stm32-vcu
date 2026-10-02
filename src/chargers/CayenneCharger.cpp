@@ -23,6 +23,7 @@
  */
 
 #include "chargers/CayenneCharger.h"
+#include "errormessage.h"
 #include "iomatrix.h"
 
 #define MAX_HV_CURRENT 32 // A, upper limit of the HV current request
@@ -503,6 +504,13 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
       Param::SetInt(Param::PlugDet, HVLM_Plug_Status > 1);
     Param::SetInt(Param::CableLim, MaxACAmps);
   }
+
+  // Charger faults (1=DC-NotOK, 2=AC-NotOK, 3=Interlock) and warnings
+  if (LAD_ChargerFault ||
+      (HVLM_ChargerErrorStatus >= 1 && HVLM_ChargerErrorStatus <= 3))
+    ErrorMessage::Post(ERR_CHGFAULT);
+  if (LAD_ChargerWarning)
+    ErrorMessage::Post(ERR_CHGWARN);
 
   //  BMS_01
   BMS_01[0] = 0x00;
