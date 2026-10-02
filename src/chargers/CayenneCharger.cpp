@@ -28,6 +28,7 @@
 
 #define MAX_HV_CURRENT 32 // A, upper limit of the HV current request
 #define MIN_VALID_HV 50   // V, below this the HV reading is not trusted
+#define TAPER_VOLTS 10.0f // V below Voltspnt over which the current tapers to 0
 
 bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq) {
   switch (Param::GetInt(Param::interface)) {
@@ -426,13 +427,25 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
 
   // Charge current limit, as for the Elcon charger: the lower of the power
   // setpoint and the BMS current limit, clamped to MAX_HV_CURRENT
-  int targetAmps = 0;
+  float limitAmps = 0;
   if (hvVolts >= MIN_VALID_HV) {
     float power = MIN(Param::GetFloat(Param::Pwrspnt),
                       Param::GetFloat(Param::BMS_ChargeLim) * hvVolts);
-    targetAmps = power / hvVolts;
+    limitAmps = MIN(power / hvVolts, MAX_HV_CURRENT);
   }
-  targetAmps = MIN(targetAmps, MAX_HV_CURRENT);
+
+  // Taper the limit linearly to 0 over the last TAPER_VOLTS below the voltage
+  // setpoint, so the current settles where the battery sits just under
+  // Voltspnt instead of stepping up and down around it
+  float headroom = voltSetpoint - hvVolts;
+  int targetAmps = limitAmps + 0.5f;
+  if (headroom < TAPER_VOLTS) {
+    targetAmps = limitAmps * MAX(headroom, 0.0f) / TAPER_VOLTS + 0.5f;
+    // Keep 1A until Voltspnt is reached so the VCU's end of charge check
+    // (udc >= Voltspnt and idc <= IdcTerm) can trigger
+    if (headroom > 0 && limitAmps >= 1)
+      targetAmps = MAX(targetAmps, 1);
+  }
 
   if (!clearToStart || stopcharge == 1)
     targetAmps = 0;
@@ -441,12 +454,10 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
   if (stopcharge == 1)
     UnLockCP();
 
-  // Ramp the HV current request 1A per 100ms, backing off once the voltage
-  // setpoint is reached
-  if (HVEM_SollStrom_HV > targetAmps ||
-      (hvVolts >= voltSetpoint && HVEM_SollStrom_HV > 0))
+  // Ramp the HV current request towards the target, 1A per 100ms
+  if (HVEM_SollStrom_HV > targetAmps)
     HVEM_SollStrom_HV--;
-  else if (HVEM_SollStrom_HV < targetAmps && hvVolts < voltSetpoint)
+  else if (HVEM_SollStrom_HV < targetAmps)
     HVEM_SollStrom_HV++;
 
   BMS_MaxCharge_Curr = targetAmps;
