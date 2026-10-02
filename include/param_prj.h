@@ -35,7 +35,7 @@
   PARAM_ENTRY(CAT_SETUP, GearLvr, SHIFTERS, 0, 5, 0, 108)                      \
   PARAM_ENTRY(CAT_SETUP, Transmission, TRNMODES, 0, 1, 0, 78)                  \
   PARAM_ENTRY(CAT_SETUP, interface, CHGINT, 0, 4, 0, 39)                       \
-  PARAM_ENTRY(CAT_SETUP, chargemodes, CHGMODS, 0, 8, 0, 37)                    \
+  PARAM_ENTRY(CAT_SETUP, chargemodes, CHGMODS, 0, 9, 0, 37)                    \
   PARAM_ENTRY(CAT_SETUP, BMS_Mode, BMSMODES, 0, 7, 0, 90)                      \
   PARAM_ENTRY(CAT_SETUP, ShuntType, SHNTYPE, 0, 4, 0, 88)                      \
   PARAM_ENTRY(CAT_SETUP, InverterCan, CAN_DEV, 0, 1, 0, 70)                    \
@@ -364,7 +364,7 @@
 #define HTCTRL "0=Disable, 1=Enable, 2=Timer"
 #define CHGMODS                                                                \
   "0=Off, 1=EXT_DIGI, 2=Volt_Ampera, 3=Leaf_PDM, 4=TeslaOI, 5=Out_lander, "    \
-  "6=Elcon, 7=MGgen2, 8=C5_PTECAN"
+  "6=Elcon, 7=MGgen2, 8=C5_PTECAN, 9=Cayenne"
 #define CHGCTRL "0=Enable, 1=Disable, 2=Timer"
 #define CHGINT "0=Unused, 1=i3LIM, 2=Chademo, 3=CPC, 4=Foccci"
 #define CAN3SPD "0=k33.3, 1=k500, 2=k100"
@@ -446,7 +446,8 @@ enum ChargeModes {
   Out_lander = 5,
   Elcon = 6,
   MGgen2 = 7,
-  C5_PTECAN = 8
+  C5_PTECAN = 8,
+  Cayenne = 9
 };
 
 enum ChargeInterfaces {

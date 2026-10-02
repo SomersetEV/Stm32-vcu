@@ -47,6 +47,7 @@
 #include "cansdo.h"
 #include "chargers/C5Charger.h"
 #include "chargers/CPC.h"
+#include "chargers/CayenneCharger.h"
 #include "chargers/ElconCharger.h"
 #include "chargers/Foccci.h"
 #include "chargers/MGgen2V2Lcharger.h"
@@ -172,6 +173,7 @@ static amperaCharger ampChg;
 static outlanderCharger outChg;
 static MGgen2V2Lcharger MGgen2v2l;
 static C5Charger c5Chg;
+static CayenneCharger CayChg;
 static FCChademo chademoFC;
 static i3LIMClass LIMFC;
 static CPCClass CPCcan;
@@ -1047,6 +1049,9 @@ static void UpdateCharger() {
     break;
   case ChargeModes::C5_PTECAN:
     selectedCharger = &c5Chg;
+    break;
+  case ChargeModes::Cayenne:
+    selectedCharger = &CayChg;
     break;
   }
   // This will call SetCanFilters() via the Clear Callback

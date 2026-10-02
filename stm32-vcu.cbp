@@ -73,6 +73,7 @@
 		<Unit filename="include/bms/stwmbms.h" />
 		<Unit filename="include/bmw_sbox.h" />
 		<Unit filename="include/chargers/C5Charger.h" />
+		<Unit filename="include/chargers/CayenneCharger.h" />
 		<Unit filename="include/chargers/C5PTECAN.h" />
 		<Unit filename="include/chargers/CPC.h" />
 		<Unit filename="include/chargers/ElconCharger.h" />
@@ -190,6 +191,7 @@
 		<Unit filename="src/bms/stwmbms.cpp" />
 		<Unit filename="src/bmw_sbox.cpp" />
 		<Unit filename="src/chargers/C5Charger.cpp" />
+		<Unit filename="src/chargers/CayenneCharger.cpp" />
 		<Unit filename="src/chargers/CPC.cpp" />
 		<Unit filename="src/chargers/ElconCharger.cpp" />
 		<Unit filename="src/chargers/Foccci.cpp" />
