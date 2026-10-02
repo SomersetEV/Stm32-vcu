@@ -9,120 +9,57 @@
 #include <libopencm3/stm32/timer.h>
 #include <stdint.h>
 
+// Supports the 7.2kW 2-phase Cayenne PHEV charger (5QE 915 681 BQ) on the
+// hybrid CAN bus. The 11kW/22kW MLBevo chargers (e-tron, e-tron GT, Taycan) use
+// a different message set and are not supported by this module.
 class CayenneCharger : public Chargerhw {
 
 public:
   bool ControlCharge(bool RunCh, bool ACReq);
-  bool parked = false;
-  bool locked = false;
   void DecodeCAN(int id, uint32_t data[2]);
   void SetCanInterface(CanHardware *c);
-
-private:
-  int opmode;
   void Task10Ms();
   void Task100Ms();
   void Task200Ms();
+  void Off();
+  void DeInit();
+
+private:
   void CalcValues100ms();
   int stopcharge = 0;
-  static void handle377(uint32_t data[2]);
-  static void handle389(uint32_t data[2]);
-  static void handle38A(uint32_t data[2]);
-  void handle488(uint32_t data[2]);      // 1
-  void handle53C(uint32_t data[2]);      // 1
-  void handle564(uint32_t data[2]);      // 1
-  void handle565(uint32_t data[2]);      // 1
-  void handle67E(uint32_t data[2]);      // 1
-  void handle415(uint32_t data[2]);      // 1
-  void handle1B000044(uint32_t data[2]); // 1
-  void handle12DD5472(uint32_t data[2]); // 1
-  void msg3C0();                         // 1
-  void msg1A1();                         // BMS_02     0x1A1  1
-  void msg64F();                         // BCM1_04    0x64F  1
-  void msg663();                         // NVEM_02    0x663  11
-  void msg191();                         // BMS_01     0x191  1
-  void msg503();                         // HVK_01     0x503  1
+  void handle488(uint32_t data[2]);      // HVLM_06
+  void handle53C(uint32_t data[2]);      // HVLM_04
+  void handle564(uint32_t data[2]);      // LAD_01
+  void handle565(uint32_t data[2]);      // HVLM_03
+  void handle67E(uint32_t data[2]);      // LAD_02
+  void handle415(uint32_t data[2]);      // stop charge message
+  void handle1B000044(uint32_t data[2]); // NMH_Ladegeraet, wake
+  void handle12DD5472(uint32_t data[2]); // HVLM_10
+  void msg3C0();                         // Klemmen_Status_01 0x3C0
+  void msg1A1();                         // BMS_02     0x1A1
+  void msg191();                         // BMS_01     0x191
+  void msg503();                         // HVK_01     0x503
   void msg39D();                         // BMS_03     0x39D
-  void msg415();                         // stop charge message
-  void msg184();                         //
-  void msg17B();                         //
-  void msg583();                         // ZV_02
-  void msg552();                         //  HVEM_05
-  void UnLockCP();                       // 1
-  void LockCP();                         // 1
-  static void canRX_488();               // HVLM_06
-  static void canRX_53C();               // HVLM_04
-  static void canRX_564();               // LAD_01
-  static void canRX_565();               // HVLM_03
-  static void canRX_67E();               // LAD_02
-  static void canRX_12DD5472();          // HVLM_10
-  static void canRX_12DD5491();          // HVLM_11
-  static void canRX_1A55549D();          // HVLM_08
-  static void canRX_1A55554D();          // HVLM_15
-  static void canRX_1A55554F();          // LAD_06
+  void msg184();                         // ZV_01      0x184
+  void msg17B();                         // FCU_02     0x17B
+  void msg583();                         // ZV_02      0x583
+  void msg552();                         // HVEM_05    0x552
+  void UnLockCP();
 
   uint8_t vag_cnt3C0 = 0x00;
-  uint8_t vag_cnt040 = 0x00;
   uint8_t vag_cnt184 = 0x00;
   uint8_t vag_cnt191 = 0x00;
-  uint8_t vag_cnt1A2 = 0x00;
-  uint8_t vag_cnt37C = 0x00;
-  uint8_t vag_cnt2AE = 0x00;
   uint8_t vag_cnt503 = 0x00;
-  uint8_t vag_cnt578 = 0x00;
-  uint8_t vag_cnt5A2 = 0x00;
-  uint8_t vag_cnt5CA = 0x00;
-  uint8_t vag_cnt5CD = 0x00;
 
-  uint16_t HVDCSetpnt;
-  uint16_t IDCSetpnt;
-  uint8_t modeSet;
-  bool active;
-
-  uint16_t setVolts, actVolts, termAmps;
-  int16_t actAmps;
-  uint8_t Airbag_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t Authentic_Time_01[8] = {0x00, 0x00, 0x00, 0x00,
-                                  0x00, 0x00, 0x00, 0x00};
-  uint8_t BCM1_04[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t BMS_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t BMS_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t BMS_03[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_04[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_06[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_07[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_09[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_10[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_11[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_16[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_27[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t BMS_DC_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t EM_HYB_11[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t ESP_15[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t Dimmung_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t DCDC_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t DCDC_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t DCDC_03[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t FCU_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t HVK_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVEM_02[8] = {0xFF, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t HVEM_05[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t Klemmen_Status_01[8] = {0x00, 0x00, 0x00, 0x00,
                                   0x00, 0x00, 0x00, 0x00};
-  uint8_t MSG_TME_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t NVEM_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t ORU_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t ZV_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_06[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_04[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t LAD_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_03[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t LAD_02[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_10[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_11[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_08[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t HVLM_15[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  uint8_t LAD_06[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t ZV_01[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint16_t ACvoltage;
   uint32_t HVLM_MaxDC_ChargePower;      // maximum DC charging power
@@ -155,12 +92,7 @@ private:
                             // 5=Reserved, 6=Init, 7=Error
   uint8_t HVLM_MaxBattChargeCurrent; // Recommended HV battery charging current
                                      // for a planned charge
-  uint8_t LAD_Mode;                  // Operating mode of the charger
-  uint16_t LAD_AC_Volt_RMS;          // Actual value AC grid voltage (RMS)
-  uint16_t LAD_VoltageOut_HV;        // Output voltage of the charger
-  uint16_t LAD_CurrentOut_HV;        // Output current charger
   uint8_t LAD_Status_Voltage;        //
-  uint16_t LAD_Temperature;          // Instantaneous value: Charger temperature
   uint16_t LAD_PowerLossVal;         // Instantaneous value: power loss charger
   uint16_t HVLM_HV_StaleTime; // Period between HV deactivated and HV activated
   uint8_t
@@ -172,8 +104,6 @@ private:
   // 3=Colour4-Green, 4=Colour5-Red, 5=Yellow Pulsing,
   // 6=Green Pulsing, 7=Red Pulsing, 8=Green/Red
   // Pulsing, 9=Green Flashing, 14=Init, 15=Error
-  uint8_t HVLM_MaxCurrent_AC; // Maximum permissible current on the primary side
-                              // (AC)
   bool HVLM_LG_ChargerTargetMode; // AC charger target mode: 0=Standby, 1=Mains
                                   // Charging
   uint8_t HVLM_TankCapReleaseRequest;     // Fuel Cap Release: 0=No Release,
@@ -202,7 +132,6 @@ private:
                                    // maximum power infrastructure (cable,
                                    // charging station) and taking into account
                                    // the charger efficiency
-  uint8_t LAD_PRX_CableCurrentLimit; // AC current limit due to PRX cable coding
   bool LAD_ControlPilotStatus; // Status control pilot monitoring (detection of
                                // the control pilot duty cycle)
   bool LAD_LockFeedback; // Status of connector lock (feedback contact of the
@@ -217,8 +146,6 @@ private:
   uint8_t HVLM_RtmWarnLadestatus;        // RTM Warning of charging status fault
   uint8_t HVLM_RtmWarnLadeKommunikation; // RTM Warning of charging communction
                                          // fault
-  bool UnLock;
-  uint32_t UnixTime;
   uint16_t BMS_Batt_Curr;
   uint16_t BMS_Batt_Volt;
   uint16_t BMS_Batt_Volt_HVterm;
@@ -231,42 +158,11 @@ private:
   uint16_t BMS_Batt_Max_Volt;
   uint16_t BMS_Min_Batt_Volt_Charge;
   uint16_t BMS_OpenCircuit_Volts;
-  bool BMS_Status_ServiceDisconnect;
-  uint8_t BMS_HV_Status;
-  bool BMS_Faultstatus;
-  int BMS_IstModus;
   int carwakeup;
-  uint16_t BMS_Batt_Ah;
-  uint16_t BMS_Target_SOC_HiRes;
 
-  uint16_t BMS_Batt_Temp;
-  uint16_t BMS_CurrBatt_Temp;
-  uint16_t BMS_CoolantTemp_Act;
-  uint16_t BMS_Batt_Energy;
-  uint16_t BMS_Max_Wh;
-  uint16_t BMS_BattEnergy_Wh_HiRes;
-  uint16_t BMS_MaxBattEnergy_Wh_HiRes;
-  uint16_t BMS_SOC;
-  uint16_t SOCx10 = 351;
-  uint16_t BMS_ResidualEnergy_Wh;
-
-  uint16_t BMS_SOC_ChargeLim;
-  uint16_t BMS_EnergyCount;
-  uint16_t BMS_EnergyReq_Full;
-  uint16_t BMS_ChargePowerMax;
-  uint16_t BMS_ChargeEnergyCount;
-
-  uint16_t BMS_IsoTest;
-  uint16_t BMS_BattCell_Temp_Max;
-  uint16_t BMS_BattCell_Temp_Min;
-  uint16_t BMS_BattCell_MV_Max;
-  uint16_t BMS_BattCell_MV_Min;
   bool HVEM_Nachladen_Anf;
   uint16_t HVEM_SollStrom_HV;
   uint16_t HVEM_MaxSpannung_HV;
-  uint8_t HMS_Systemstatus;
-  uint8_t HMS_aktives_System;
-  bool HMS_Fehlerstatus;
   uint8_t HVK_HVLM_Sollmodus; // Requested target mode of the charging manager:
                               // 0=Not Enabled, 1=Enabled
   bool HV_Bordnetz_aktiv; // Indicates an active high-voltage vehicle electrical
@@ -305,51 +201,21 @@ private:
   bool BCM_Tankklappensteller_Fehler;
   bool FCU_TK_Betankung_Anforderung;
   uint8_t FCU_TK_Freigabe_Tankklappe;
-  bool BMS_Charger_Active;
-  uint16_t BMS_RIso_Ext = 4090;
   uint8_t HVK_Gesamtst_Spgfreiheit;
-  uint8_t BMS_Balancing_Active = 2;
-  uint8_t BMS_Freig_max_Perf = 1;
-  uint8_t BMS_Battdiag =
-      1; // Battery Display Diagnostics: 1 = Display Battery, 4 = Display
-         // Battery OK, 5 = Charging, 6 = Check Battery
-  uint8_t DC_IstModus_02 = 2;
-
-  uint8_t BMS_HV_Auszeit_Status = 1; // Status HV timeout.
-  uint16_t BMS_HV_Auszeit = 25;      // Time since last HV Activity
-  uint16_t BMS_Kapazitaet = 1000;    //  Total Energy Capacity (aged)
-  uint16_t BMS_SOC_Kaltstart = 0;    // SOC Cold
-  uint8_t BMS_max_Grenz_SOC =
-      30; // Upper limit of SOC operating strategy (70 offset, so 30 = 100)
-  uint8_t BMS_min_Grenz_SOC = 15; // Lower limit of SOC Operating strategy
-
-  uint8_t EM1_Istmodus2;          // EM1 Status, 0=standby
-  uint8_t EM1_Status_Spgfreiheit; // Voltage Status: 0=Init, 1=NoVoltage,
-                                  // 2=Voltage, 3=Fault & Voltage
 
   bool ZAS_Kl_S;                   // KeySwitch Inserted
   bool ZAS_Kl_15;                  // Acc position
   bool ZAS_Kl_X;                   // Run position
   bool ZAS_Kl_50_Startanforderung; // Start
 
-  uint8_t chargeractive;
-  uint8_t Counter_Statemachine;
-  uint8_t ChargeActiveDelayCnt;
-
   uint16_t HVVoltage;
-  uint16_t MaxHV;
   int8_t temperature;
   uint8_t mode;
   uint16_t current;
-  uint16_t targetcurrent;
+  float hvCurrent; // A, charger HV output current from LAD_01
   uint8_t MaxACAmps;
-  uint8_t ISetPnt;
   uint8_t PPLim;
-  uint8_t currentRamp;
-  bool clearToStart = false, shutDownReq = false, pwmON = false;
-  static uint8_t chgStatus, evseDuty;
-  static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
-  static float LV_Volts, LV_Amps;
+  bool clearToStart = false;
 
   uint8_t vw_crc_calc(uint8_t *inputBytes, uint8_t length, uint16_t address) {
     const uint8_t poly = 0x2F;

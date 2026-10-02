@@ -25,6 +25,7 @@ Chargers/DCDC converters:
 - Mitsubishi Outlander OBC
 - TESLA Gen 2 DCDC Converter Can support
 - Elcon charger Support
+- Porsche Cayenne PHEV 7.2kW OBC (5QE 915 681 BQ). The 11kW/22kW MLBevo chargers are not supported
 - CCS DC fast charge via BMW i3 LIM
 - CCS DC fast charging via FOCCCI https://github.com/uhi22/ccs32clara
 - Chademo DC fast charge

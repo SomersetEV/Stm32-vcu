@@ -23,44 +23,37 @@
  */
 
 #include "chargers/CayenneCharger.h"
+#include "iomatrix.h"
+
+#define MAX_HV_CURRENT 32 // A, upper limit of the HV current request
+#define MIN_VALID_HV 50   // V, below this the HV reading is not trusted
 
 bool CayenneCharger::ControlCharge(bool RunCh, bool ACReq) {
-  int chgmode = Param::GetInt(Param::interface);
-  switch (chgmode) {
+  switch (Param::GetInt(Param::interface)) {
   case Unused:
-    if (HVLM_Plug_Status > 1 && RunCh) {
-      clearToStart = true;
-      return true;
-    } else {
-      clearToStart = false;
-      return false;
-    }
-
-    break;
-  case i3LIM:
-    if (RunCh &&
-        ACReq) // we have a startup request to AC charge from a charge interface
-    {
-      clearToStart = true;
-      return true;
-    } else {
-      clearToStart = false;
-      return false;
-    }
-    break;
-
   case Chademo:
-    if (HVLM_Plug_Status > 1 && RunCh) {
-      clearToStart = true;
-      return true;
-    } else {
-      clearToStart = false;
-      return false;
-    }
-
+    // No AC charge interface, so start on the charger's own plug detection
+    clearToStart = RunCh && HVLM_Plug_Status > 1;
+    break;
+  default:
+    // i3LIM, CPC and Foccci report the AC charge request through ACReq
+    clearToStart = RunCh && ACReq;
     break;
   }
+  return clearToStart;
 }
+
+void CayenneCharger::Off() {
+  clearToStart = false;
+  HVEM_SollStrom_HV = 0;
+  BMS_MaxCharge_Curr = 0;
+}
+
+void CayenneCharger::DeInit() {
+  Off();
+  stopcharge = 0;
+}
+
 void CayenneCharger::Task10Ms() {
   msg191(); // BMS_01   0x191
 }
@@ -68,14 +61,14 @@ void CayenneCharger::Task10Ms() {
 void CayenneCharger::Task100Ms()
 
 {
+  CalcValues100ms();
   msg3C0(); //  Klemmen_Status_01
   msg503(); // HVK_01     0x503
   msg1A1(); // BMS_02   0x1A1
   msg184(); // ZV_01    0x184
   msg17B(); // FCU_02   0x17B
-  msg39D();
+  msg39D(); // BMS_03   0x39D
   msg552(); // HVEM_05
-  CalcValues100ms();
 }
 void CayenneCharger::Task200Ms()
 
@@ -157,6 +150,9 @@ void CayenneCharger::msg184() // ZV_01   0x184
   bytes[7] = ZV_01[7];
   bytes[0] = vw_crc_calc(bytes, 8, 0x184);
   can->Send(0x184, (uint32_t *)bytes, 8);
+  vag_cnt184++;
+  if (vag_cnt184 > 0x0f)
+    vag_cnt184 = 0x00;
 }
 
 void CayenneCharger::msg1A1() // BMS_02   0x1A1
@@ -171,34 +167,6 @@ void CayenneCharger::msg1A1() // BMS_02   0x1A1
   bytes[6] = BMS_02[6];
   bytes[7] = BMS_02[7];
   can->Send(0x1A1, (uint32_t *)bytes, 8);
-}
-
-void CayenneCharger::msg64F() // BCM1_04 - 0x64F
-{
-  uint8_t bytes[8];
-  bytes[0] = 0x00;
-  bytes[1] = 0x00;
-  bytes[2] = 0x00;
-  bytes[3] = 0x00;
-  bytes[4] = 0x00;
-  bytes[5] = 0x00;
-  bytes[6] = 0x00;
-  bytes[7] = 0x00;
-  can->Send(0x64F, (uint32_t *)bytes, 8);
-}
-
-void CayenneCharger::msg663() // NVEM_02 - 0x663
-{
-  uint8_t bytes[8];
-  bytes[0] = 0x00;
-  bytes[1] = 0x11;
-  bytes[2] = 0x22;
-  bytes[3] = 0x33;
-  bytes[4] = 0x44;
-  bytes[5] = 0x55;
-  bytes[6] = 0x66;
-  bytes[7] = 0x77;
-  can->Send(0x663, (uint32_t *)bytes, 8);
 }
 
 // Messages with CRC and counters
@@ -238,7 +206,7 @@ void CayenneCharger::msg3C0() // Klemmen_Status_01
     vag_cnt3C0 = 0x00;
 }
 
-void CayenneCharger::msg39D() // Klemmen_Status_01
+void CayenneCharger::msg39D() // BMS_03   0x39D
 {
   uint8_t bytes[8];
   bytes[0] = BMS_03[0];
@@ -258,12 +226,6 @@ void CayenneCharger::UnLockCP() {
   FCU_TK_Freigabe_Tankklappe = 1;
   ZV_verriegelt_extern_ist = 0;
   ZV_verriegelt_soll = 1;
-}
-void CayenneCharger::LockCP() {
-  ZV_FT_verriegeln = 1;
-  ZV_verriegelt_extern_ist = 1;
-  ZV_entriegeln_Anf = 0;
-  FCU_TK_Freigabe_Tankklappe = 0;
 }
 
 void CayenneCharger::SetCanInterface(CanHardware *c) {
@@ -366,12 +328,22 @@ void CayenneCharger::handle564(uint32_t data[2])
   ACvoltage = ((bytes[2] & (0xFFU)) << 1) | ((bytes[1] >> 7) & (0x01U));
   Param::SetFloat(Param::AC_Volts, ACvoltage);
   HVVoltage = (((bytes[4] & (0x03U)) << 8) | (bytes[3] & (0xFFU)));
-  current =
-      ((((bytes[5] & (0x0FU)) << 6) | ((bytes[4] >> 2) & (0x3FU))) * 0.2) - 102;
+  hvCurrent =
+      ((((bytes[5] & (0x0FU)) << 6) | ((bytes[4] >> 2) & (0x3FU))) * 0.2f) -
+      102;
+  current = (int16_t)hvCurrent;
   LAD_Status_Voltage = ((bytes[5] >> 4) & (0x03U));
   temperature = bytes[6] - 40;
   Param::SetFloat(Param::ChgTemp, temperature);
   LAD_PowerLossVal = ((bytes[7] & (0xFFU))) * 20;
+
+  if (Param::GetInt(Param::ShuntType) == 0 &&
+      Param::GetInt(Param::Inverter) != InvModes::Leaf_Gen1) {
+    // Only backfill HV voltage/current from the charger when no dedicated
+    // shunt is configured and the Leaf inverter is not already providing it.
+    Param::SetFloat(Param::udc, HVVoltage);
+    Param::SetFloat(Param::idc, hvCurrent > 0 ? hvCurrent : 0);
+  }
 }
 
 void CayenneCharger::handle565(uint32_t data[2])
@@ -445,176 +417,91 @@ void CayenneCharger::handle415(uint32_t data[2])
 
 void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
 {
+  // Use the measured HV voltage, falling back to the charger's own reading
+  float hvVolts = Param::GetFloat(Param::udc);
+  if (hvVolts < MIN_VALID_HV)
+    hvVolts = HVVoltage;
+  int voltSetpoint = Param::GetInt(Param::Voltspnt);
+
+  // Charge current limit, as for the Elcon charger: the lower of the power
+  // setpoint and the BMS current limit, clamped to MAX_HV_CURRENT
+  int targetAmps = 0;
+  if (hvVolts >= MIN_VALID_HV) {
+    float power = MIN(Param::GetFloat(Param::Pwrspnt),
+                      Param::GetFloat(Param::BMS_ChargeLim) * hvVolts);
+    targetAmps = power / hvVolts;
+  }
+  targetAmps = MIN(targetAmps, MAX_HV_CURRENT);
+
+  if (!clearToStart || stopcharge == 1)
+    targetAmps = 0;
+
+  // stop charging
+  if (stopcharge == 1)
+    UnLockCP();
+
+  // Ramp the HV current request 1A per 100ms, backing off once the voltage
+  // setpoint is reached
+  if (HVEM_SollStrom_HV > targetAmps ||
+      (hvVolts >= voltSetpoint && HVEM_SollStrom_HV > 0))
+    HVEM_SollStrom_HV--;
+  else if (HVEM_SollStrom_HV < targetAmps && hvVolts < voltSetpoint)
+    HVEM_SollStrom_HV++;
+
+  BMS_MaxCharge_Curr = targetAmps;
+  HVEM_MaxSpannung_HV = voltSetpoint;
+  BMS_Batt_Max_Volt = voltSetpoint;
+
+  // Use the VCU SoC, falling back to the previous fixed value when no SoC
+  // source is configured
+  float soc = Param::GetFloat(Param::SOC);
+  if (soc <= 0)
+    soc = 35.1f;
+  BMS_SOC_HiRes = soc * 20; // 0.05% per bit
 
   // Runtime Values:
   BMS_Batt_Curr = (current + 2047);
-
-  BMS_SOC_HiRes = (SOCx10) * 2;
-  BMS_SOC_Kaltstart = (SOCx10) * 2;
 
   // BMS Limits Discharge:
   BMS_MaxDischarge_Curr = 1500;
   BMS_Min_Batt_Volt = 0;
   BMS_Min_Batt_Volt_Discharge = 0;
-  // BMS Limits Charge:
-  if (actVolts < Param::GetInt(Param::Voltspnt))
-    HVEM_SollStrom_HV++;
-  if (actVolts >= Param::GetInt(Param::Voltspnt))
-    HVEM_SollStrom_HV--;
-  if (HVEM_SollStrom_HV > 32)
-    HVEM_SollStrom_HV = 32; // clamp max amps to 32amps
-  // HVEM_SollStrom_HV = (HVEM_SollStrom_HV+205)*5; //might need to add in this
-  // maths if it doesnt charge
-
-  if (BMS_MaxCharge_Curr > 32)
-    BMS_MaxCharge_Curr = 32; // clamp max amps to 32amps
-  if (BMS_MaxCharge_Curr >= GetInt(Param::BMS_ChargeLim))
-    BMS_MaxCharge_Curr =
-        GetInt(Param::BMS_ChargeLim); // clamp to max of BMS charge limit
-
-  // stop charging
-  if (stopcharge == 1) {
-    BMS_MaxCharge_Curr = 0;
-    UnLockCP();
-    // stopcharge = 0;
-  } else {
-    // LockCP();
-  }
-
-  if (clearToStart) {
-    chargeractive = 1;
-  }
-
-  else {
-    chargeractive = 0;
-  }
-
   BMS_MaxCharge_Curr_Offset = 0;
-  BMS_Batt_Max_Volt = 382; //(HVDCSetpnt);
   BMS_Min_Batt_Volt_Charge = 0;
   BMS_OpenCircuit_Volts = 0;
 
-  // BMS_Status_ServiceDisconnect = (battery_status.HVIL_Open);
-
-  //  BMS_Faultstatus = (battery_status.BMS_Status);
-  // BMS_Batt_Ah = (battery_status.BMSCellAhx10) / 2;
-  // BMS_Target_SOC_HiRes = (battery_status.SOC_Targetx10) * 2;
-
-  // BMS_Batt_Temp = ((battery_status.BMS_Battery_Tempx10) + 400) / 5;
-  // BMS_CurrBatt_Temp = ((battery_status.BMS_Battery_Tempx10) + 400) / 5;
-  // BMS_CoolantTemp_Act = ((battery_status.BMS_Coolant_Tempx10) + 400) / 5;
-  // BMS_Batt_Energy = (battery_status.CapkWhx10) * 2;
-  BMS_Battdiag = 0;
-
-  //  BMS_Max_Wh = (battery_status.CapkWhx10 * 2);
-  BMS_BattEnergy_Wh_HiRes = 0;
-  BMS_MaxBattEnergy_Wh_HiRes = 0;
-  BMS_SOC = 30;
-  BMS_ResidualEnergy_Wh = 0;
-
-  // BMS_SOC_ChargeLim = (battery_status.SOC_Targetx10) / 10;
-  BMS_EnergyCount = 0;
-  // BMS_EnergyReq_Full = ((battery_status.SOC_Targetx10 -
-  // battery_status.SOCx10) * battery_status.CapkWhx10) / 2500;
-  BMS_ChargePowerMax = 625;
-  BMS_ChargeEnergyCount = 0;
-
-  // BMS_BattCell_Temp_Max = ((battery_status.BMS_Cell_H_Tempx10) + 400) / 5;
-  //  BMS_BattCell_Temp_Min = ((battery_status.BMS_Cell_L_Tempx10) + 400) / 5;
-  // BMS_BattCell_MV_Max = (battery_status.BMS_Cell_H_mV) - 1000;
-  // BMS_BattCell_MV_Min = (battery_status.BMS_Cell_L_mV) - 1000;
-
   HVEM_Nachladen_Anf = false; // Request for HV charging with plugged in
                               // connector and deactivated charging request
-  // HVEM_SollStrom_HV =;  // Target current charging on the HV side
-  // HVEM_MaxSpannung_HV =; // Maximum charging voltage to the charger or DC
-  // charging station
 
-  if (HVLM_Park_Request = 1) {
-    if (HMS_Systemstatus = 2)
-      HMS_Systemstatus = 3;
-    else
-      HMS_Systemstatus =
-          2; // 0 "No_function_active" 1 "Hold_active" 2 "Parking_requested" 3
-             // "Parking_active" 4 "Keep parking_active" 5 "Start_active" 6
-             // "Release_request_active" 7 "Release_request_by_driver" 8
-             // "Slipping_detected" 9 "Hold_standby_active" 10
-             // "Start_standby_active" 14 "Init" 15 "Error " ;
-    if (HMS_Systemstatus < 1) {
-      HMS_aktives_System =
-          6; // 0 "No_System__Init_Error" 1 "Driver request_active" 2
-             // "HMS_internal_active" 3 "ACC_active" 4 "Autohold_active" 5
-             // "HHC_active" 6 "HVLM_active" 7 "Getriebe_aktiv" 8 "EBKV_aktiv" 9
-             // "ParkAssist_aktiv" 10 "ARA_aktiv" 12 "Autonomous_Hold_aktiv" 13
-             // "STA_aktiv " 14 "Motor_aktiv" 15 "EA_aktiv" 16 "VLK_aktiv" ;
-    } else {
-      HMS_aktives_System = 0;
-    }
-    // HMS_Fehlerstatus = false; //0 "No error" 1 "Stopping_not_possible" 2
-    // "Special operating mode_active" 3 "System restriction" 4 "System fault" ;
-  }
-
-  if (HVLM_HV_ActivationRequest = 1) {
-    HV_Bordnetz_aktiv = true; // Indicates an active high-voltage vehicle
-                              // electrical system: 0 = Not Active,  1 = Active
-    HVK_BMS_Sollmodus = 4;
-    BMS_IstModus = 4;  // 0=Standby, 1=HV Active (Driving) 2=Balancing 4=AC
-                       // charge, 6=DC charge, 7=init
-    BMS_HV_Status = 1; // HV System Voltage Detected  // Voltage Status: 0=Init,
-                       // 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-    HVK_MO_EmSollzustand = 50;
-    BMS_Charger_Active = 1;
-    BMS_Batt_Volt = 400 * 4;
-    BMS_Batt_Volt_HVterm = 400 * 2;
-    if (HVVoltage > 250) {
-      BMS_Batt_Volt = (HVVoltage) * 4;
-      BMS_Batt_Volt_HVterm = (HVVoltage) * 2;
-    }
-  }
-
-  if (HVLM_HV_ActivationRequest = 0) {
-    HV_Bordnetz_aktiv = false; // Indicates an active high-voltage vehicle
-                               // electrical system: 0 = Not Active,  1 = Active
-    HVK_BMS_Sollmodus = 0;
-    BMS_IstModus = 0;  // 0=Standby, 1=HV Active (Driving) 2=Balancing 4=AC
-                       // charge, 6=DC charge, 7=init
-    BMS_HV_Status = 0; // HV No Voltage // Voltage Status: 0=Init, 1=NoVoltage,
-                       // 2=Voltage, 3=Fault & Voltage
-    HVK_MO_EmSollzustand = 50;
-    BMS_Charger_Active = 0;
+  // The charger only charges while it sees the HV system up and the BMS in AC
+  // charge mode. Earlier versions always sent these values (the if statements
+  // that were meant to switch them used = instead of ==), so they are kept
+  // constant here.
+  HV_Bordnetz_aktiv = true;  // Indicates an active high-voltage vehicle
+                             // electrical system: 0 = Not Active,  1 = Active
+  HVK_BMS_Sollmodus = 4;     // 4 = AC_Charging
+  HVK_MO_EmSollzustand = 50; // HvAcCh
+  HVK_DCDC_Sollmodus = 2;    // Step down
+  HVK_Gesamtst_Spgfreiheit =
+      2; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
+  BMS_Batt_Volt = 400 * 4;
+  BMS_Batt_Volt_HVterm = 400 * 2;
+  if (HVVoltage > 250) {
     BMS_Batt_Volt = (HVVoltage) * 4;
     BMS_Batt_Volt_HVterm = (HVVoltage) * 2;
   }
-  if (BMS_HV_Status = 1) {
-    HVK_DCDC_Sollmodus =
-        2; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-    EM1_Status_Spgfreiheit =
-        2; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-    HVK_Gesamtst_Spgfreiheit =
-        2; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-  }
-  if (BMS_HV_Status = 0) {
-    HVK_DCDC_Sollmodus =
-        1; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-    EM1_Status_Spgfreiheit =
-        1; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-    HVK_Gesamtst_Spgfreiheit =
-        1; // Voltage Status: 0=Init, 1=NoVoltage, 2=Voltage, 3=Fault & Voltage
-  }
 
-  switch (chargeractive) {
-  case 0:                       // Charger Standby
-    HVK_HVLM_Sollmodus = false; // Requested target mode of the charging
-                                // manager: 0=Not Enabled, 1=Enabled
-    break;
+  HVK_HVLM_Sollmodus = clearToStart; // Requested target mode of the charging
+                                     // manager: 0=Not Enabled, 1=Enabled
 
-  case 1: // HV Active - Charger Active
-    // HVEM_Nachladen_Anf = true; // Request for HV charging with plugged in
-    // connector and deactivated charging request
-    HVK_HVLM_Sollmodus = true; // Requested target mode of the charging manager:
-                               // 0=Not Enabled, 1=Enabled
-
-    break;
+  // Plug detection and EVSE current limit, when no charge interface or PP
+  // input reports them
+  if (Param::GetInt(Param::interface) == Unused) {
+    bool ppInput = Param::GetInt(Param::GPA1Func) == IOMatrix::PILOT_PROX ||
+                   Param::GetInt(Param::GPA2Func) == IOMatrix::PILOT_PROX;
+    if (!ppInput)
+      Param::SetInt(Param::PlugDet, HVLM_Plug_Status > 1);
+    Param::SetInt(Param::CableLim, MaxACAmps);
   }
 
   //  BMS_01
@@ -660,154 +547,6 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
               ((BMS_Min_Batt_Volt_Charge & (0x03U)) << 6);
   BMS_03[7] = ((BMS_Min_Batt_Volt_Charge >> 2) & (0xFFU));
 
-  //  BMS_04
-  // BMS_IstModus = Target mode 0=Standby, 1=HV Active (Driving) 2=Balancing
-  // 4=AC charge, 6=DC charge, 7=init
-  BMS_04[0] = 0x00;
-  BMS_04[1] = (0x00 & (0x0FU)) |
-              ((BMS_Status_ServiceDisconnect & (0x01U)) << 5) |
-              ((BMS_HV_Status & (0x03U)) << 6);
-  BMS_04[2] = 0x00 | ((BMS_IstModus & (0x07U)) << 1) |
-              ((BMS_Faultstatus & (0x07U)) << 4) |
-              ((BMS_Batt_Ah & (0x01U)) << 7);
-  BMS_04[3] = ((BMS_Batt_Ah >> 1) & (0xFFU));
-  BMS_04[4] = ((BMS_Batt_Ah >> 9) & (0x03U));
-  BMS_04[6] = ((BMS_Target_SOC_HiRes & (0x07U)) << 5);
-  BMS_04[7] = ((BMS_Target_SOC_HiRes >> 3) & (0xFFU));
-
-  //  BMS_07
-
-  //  BMS_Gesamtst_Spgfreiheit = Volt Free Status
-  //  BMS_RIso_Ext = Isolation Resistance
-
-  BMS_07[0] = 0x00;
-  BMS_07[1] = (0x00 & (0x0FU)) | ((BMS_Batt_Energy & (0x0FU)) << 4);
-  BMS_07[2] = ((BMS_Batt_Energy >> 4) & (0x7FU)) |
-              ((BMS_Charger_Active & (0x01U))
-               << 7); // BMS_07[2] = ((BMS_Batt_Energy >> 4) & (0x7FU)) |
-                      // ((BMS_Charger_Active & (0x01U)) << 7);
-  BMS_07[3] = (BMS_Battdiag & (0x07U)) | ((BMS_Freig_max_Perf & (0x03U)) << 3) |
-              ((BMS_Balancing_Active & (0x03U)) << 6);
-  BMS_07[4] = (BMS_Max_Wh & (0xFFU));
-  BMS_07[5] = ((BMS_Max_Wh >> 8) & (0x07U)) | ((0x0 & (0x01U)) << 3) |
-              ((0x00 & (0x03U)) << 4) |
-              ((0x00 & (0x03U))
-               << 6); // BMS_07[5] = ((BMS_Max_Wh >> 8) & (0x07U)) | ((0x0 &
-                      // (0x01U)) << 3) | ((BMS_Gesamtst_Spgfreiheit & (0x03U))
-                      // << 4) | ((BMS_RIso_Ext & (0x03U)) << 6);
-  BMS_07[6] = ((BMS_RIso_Ext >> 2) & (0xFFU));
-  // BMS_07[7] = ((BMS_RIso_Ext >> 10) & (0x03U)) | ((BMS_Batt_Warn & (0x03U))
-  // << 2) | ((BMS_Coolant_Leak & (0x03U)) << 4);
-  BMS_07[7] = ((BMS_RIso_Ext >> 10) & (0x03U)) | ((0x00 & (0x03U)) << 2) |
-              ((0x00 & (0x03U)) << 4);
-  //  BMS_09
-  BMS_09[2] = ((BMS_HV_Auszeit_Status & (0x03U)) << 5) |
-              ((BMS_HV_Auszeit & (0x01U)) << 7);
-  BMS_09[3] = ((BMS_HV_Auszeit >> 1) & (0xFFU));
-  BMS_09[4] = (BMS_Kapazitaet & (0xFFU));
-  BMS_09[5] =
-      ((BMS_Kapazitaet >> 8) & (0x07U)) | ((BMS_SOC_Kaltstart & (0x1FU)) << 3);
-  BMS_09[6] = ((BMS_SOC_Kaltstart >> 5) & (0x3FU)) |
-              ((BMS_max_Grenz_SOC & (0x03U)) << 6);
-  BMS_09[7] = ((BMS_max_Grenz_SOC >> 2) & (0x07U)) |
-              ((BMS_min_Grenz_SOC & (0x1FU)) << 3);
-
-  //  BMS_10
-  BMS_10[0] = (BMS_BattEnergy_Wh_HiRes & (0xFFU));
-  BMS_10[1] = ((BMS_BattEnergy_Wh_HiRes >> 8) & (0x7FU)) |
-              ((BMS_MaxBattEnergy_Wh_HiRes & (0x01U)) << 7);
-  BMS_10[2] = ((BMS_MaxBattEnergy_Wh_HiRes >> 1) & (0xFFU));
-  BMS_10[3] = ((BMS_MaxBattEnergy_Wh_HiRes >> 9) & (0x3FU)) |
-              ((BMS_SOC & (0x03U)) << 6);
-  BMS_10[4] =
-      ((BMS_SOC >> 2) & (0x3FU)) | ((BMS_ResidualEnergy_Wh & (0x03U)) << 6);
-  BMS_10[5] = ((BMS_ResidualEnergy_Wh >> 2) & (0xFFU));
-  BMS_10[6] =
-      ((BMS_ResidualEnergy_Wh >> 10) & (0x03U)) | ((0x64 & (0x3FU)) << 2);
-  BMS_10[7] = ((0x64 >> 6) & (0x01U)) | ((0x64 & (0x7FU)) << 1);
-
-  //  BMS_11
-
-  BMS_11[0] = 0x00;
-  BMS_11[1] = 0x00;
-  BMS_11[2] = ((0x02 & (0x0FU)) << 1) | ((0x01 & (0x07U)) << 5);
-  BMS_11[3] = (BMS_BattCell_Temp_Max & (0xFFU));
-  BMS_11[4] = (BMS_BattCell_Temp_Min & (0xFFU));
-  BMS_11[5] = (BMS_BattCell_MV_Max & (0xFFU));
-  BMS_11[6] = ((BMS_BattCell_MV_Max >> 8) & (0x0FU)) |
-              ((BMS_BattCell_MV_Min & (0x0FU)) << 4);
-  BMS_11[7] = ((BMS_BattCell_MV_Min >> 4) & (0xFFU));
-
-  //  BMS_27
-
-  // BMS_EnergyCount = Progressive Energy counter from 0-13?
-  // BMS_ChargeEnergyCount = Same as above for charge
-  BMS_27[0] = 0x00;
-  BMS_27[1] = 0x00;
-  BMS_27[2] = 0x00;
-  BMS_27[3] = ((BMS_SOC_ChargeLim & (0x3FU)) << 2);
-  BMS_27[4] = ((BMS_SOC_ChargeLim >> 6) & (0x01U)) |
-              ((BMS_EnergyCount & (0x0FU)) << 1) |
-              ((BMS_EnergyReq_Full & (0x07U)) << 5);
-  BMS_27[5] = ((BMS_EnergyReq_Full >> 3) & (0xFFU));
-  BMS_27[6] = (BMS_ChargePowerMax & (0xFFU));
-  BMS_27[7] = ((BMS_ChargePowerMax >> 8) & (0x0FU)) |
-              ((BMS_ChargeEnergyCount & (0x0FU)) << 4);
-
-  //  BMS_DC_01
-
-  //  BMS_Status_DCLS = Status of the voltage monitoring at the DC charging
-  //  interface | 0=inactive, 1= i.O, 2= n.i.O, 3= Active BMS_DCLS_Spannung = DC
-  //  voltage of the charging station. Measurement between the DC HV lines.
-  //  BMS_DCLS_MaxLadeStrom = maximum permissible DC charging current
-
-  // BMS_DC_01[0] = (BMS_DC_01_CRC & (0xFFU));
-  // BMS_DC_01[1] = (BMS_DC_01_BZ & (0x0FU)) | ((BMS_Status_DCLS & (0x03U)) <<
-  // 4) | ((BMS_DCLS_Spannung & (0x03U)) << 6); BMS_DC_01[2] =
-  // ((BMS_DCLS_Spannung >> 2) & (0xFFU)); BMS_DC_01[3] = (BMS_DCLS_MaxLadeStrom
-  // & (0xFFU)); BMS_DC_01[4] = ((BMS_DCLS_MaxLadeStrom >> 8) & (0x01U));
-  // BMS_DC_01[5] = 0x00;
-  // BMS_DC_01[6] = 0x00;
-  // BMS_DC_01[7] = 0x00;
-
-  //  DCDC_01 - For DC/DC 12V Converter
-  //  Intend to mirror HV voltage from main bus (unless found elsewhere)
-  //  Charger only seems interested in the 12V output Current & Voltage from
-  //  module?
-  // DCDC_01[0] = 0x00;
-  // DCDC_01[1] = (0x00 & (0x0FU)) | ((DC_IstSpannung_HV & (0x0FU)) << 4);
-  // DCDC_01[2] = ((DC_IstSpannung_HV >> 4) & (0xFFU));
-  // DCDC_01[3] = (DC_IstStrom_HV_02 & (0xFFU));
-  // DCDC_01[4] = ((DC_IstStrom_HV_02 >> 8) & (0x03U)) | ((DC_IstStrom_NV &
-  // (0x3FU)) << 2); DCDC_01[5] = ((DC_IstStrom_NV >> 6) & (0x0FU)); DCDC_01[7]
-  // = (DC_IstSpannung_NV & (0xFFU));
-
-  //  DCDC_03 - For DC/DC 12V Converter
-  //  Charger only seems interested in the DC_IstModus_02 - Status signal, Set
-  //  to 0 for standby, or 3 for raise
-  // DCDC_03[0] = (DCDC_03_CRC & (0xFFU));
-  // DCDC_03[1] = (DCDC_03_BZ & (0x0FU));
-  // DCDC_03[2] = (DC_Fehlerstatus & (0x07U)) | ((DC_Peakstrom_verfuegbar &
-  // (0x01U)) << 3) | ((DC_Abregelung_Temperatur & (0x01U)) << 4) |
-  // ((DC_IstModus_02 & (0x07U)) << 5);
-  DCDC_03[2] = (0x00 & (0x07U)) | ((0x00 & (0x01U)) << 3) |
-               ((0x00 & (0x01U)) << 4) | ((DC_IstModus_02 & (0x07U)) << 5);
-  // DCDC_03[3] = ((DC_HV_EKK_IstModus & (0x07U)) << 4);
-  // DCDC_03[5] = ((DC_Status_Spgfreiheit_HV & (0x03U)) << 6);
-  // DCDC_03[6] = (DC_IstSpannung_EKK_HV & (0xFFU));
-  // DCDC_03[7] = (DC_Temperatur & (0xFFU));
-
-  //  Dimmung_01
-  //  Charger conserned about the 58x signals - Likely just for the Charge port
-  //  light output, Setting to 100% static for now
-  // Dimmung_01[0] = (DI_KL_58xd & (0xFFU));
-  // Dimmung_01[1] = (DI_KL_58xs & (0x7FU)) | ((DI_Display_Nachtdesign &
-  // (0x01U)) << 7); Dimmung_01[2] = (DI_KL_58xt & (0x7FU)); Dimmung_01[3] =
-  // (DI_Fotosensor & (0xFFU)); Dimmung_01[4] = ((DI_Fotosensor >> 8) &
-  // (0xFFU)); Dimmung_01[5] = (BCM1_Stellgroesse_Kl_58s & (0x7FU));
-  // Dimmung_01[6] = 0x00;
-  // Dimmung_01[7] = 0x00;
-
   //  HVEM_05
   //  HVEM_Nachladen_Anf - Request for HV charging with plugged in connector and
   //  deactivated charging request HVEM_SollStrom_HV - Target current charging
@@ -824,146 +563,45 @@ void CayenneCharger::CalcValues100ms() // Run to calculate values every 100 ms
   HVEM_05[6] = ((HVEM_MaxSpannung_HV >> 4) & (0x3FU)) | ((0x00 & (0x03U)) << 6);
   HVEM_05[7] = 0x00;
 
-  // Authentic_Time_01 & NavData_02
-  Authentic_Time_01[4] = (UnixTime & (0xFFU));
-  Authentic_Time_01[5] = ((UnixTime >> 8) & (0xFFU));
-  Authentic_Time_01[6] = ((UnixTime >> 16) & (0xFFU));
-  Authentic_Time_01[7] = ((UnixTime >> 24) & (0xFFU));
-
-  ESP_15[4] = (0x00 & (0x01U)) | ((0x00 & (0x07U)) << 1) |
-              ((HMS_Systemstatus & (0x0FU)) << 4);
-  ESP_15[5] = (0x00 & (0x07U)) | ((HMS_aktives_System & (0x1FU)) << 3);
-  ESP_15[6] = (0x00 & (0x01U)) | ((0x00 & (0x01U)) << 1) |
-              ((HMS_Fehlerstatus & (0x07U)) << 2) | ((0x00 & (0x01U)) << 5) |
-              ((0x00 & (0x03U)) << 6);
-
-  // Klemmen_Status_01[1] = (0x00& (0x0FU)) | ((RSt_Fahrerhinweise & (0x0FU)) <<
-  // 4); Klemmen_Status_01[2] = (ZAS_Kl_S & (0x01U)) | ((ZAS_Kl_15 & (0x01U)) <<
-  // 1) | ((ZAS_Kl_X & (0x01U)) << 2) | ((ZAS_Kl_50_Startanforderung & (0x01U))
-  // << 3) | ((BCM_Remotestart_Betrieb & (0x01U)) << 4) | ((ZAS_Kl_Infotainment
-  // & (0x01U)) << 5) | ((BCM_Remotestart_KL15_Anf & (0x01U)) << 6) |
-  // ((BCM_Remotestart_MO_Start & (0x01U)) << 7);
   Klemmen_Status_01[2] = (ZAS_Kl_S & (0x01U)) | ((ZAS_Kl_15 & (0x01U)) << 1) |
                          ((ZAS_Kl_X & (0x01U)) << 2) |
                          ((ZAS_Kl_50_Startanforderung & (0x01U)) << 3) |
                          ((0x00 & (0x01U)) << 4) | ((0x00 & (0x01U)) << 5) |
                          ((0x00 & (0x01U)) << 6) | ((0x00 & (0x01U)) << 7);
-  // Klemmen_Status_01[3] = (KST_Warn_P1_ZST_def & (0x01U)) |
-  // ((KST_Warn_P2_ZST_def & (0x01U)) << 1) | ((KST_Fahrerhinweis_1 & (0x01U))
-  // << 2) | ((KST_Fahrerhinweis_2 & (0x01U)) << 3) | ((BCM_Ausparken_Betrieb &
-  // (0x01U)) << 4) | ((KST_Fahrerhinweis_4 & (0x01U)) << 5) |
-  // ((KST_Fahrerhinweis_5 & (0x01U)) << 6) | ((KST_Fahrerhinweis_6 & (0x01U))
-  // << 7);
 
   HVK_01[1] =
       (0x00 & (0x0FU)) | ((0x00 & (0x01U)) << 4) | ((0x00 & (0x03U)) << 5);
   HVK_01[2] = (HVK_MO_EmSollzustand & (0xFFU));
-  // HVK_01[3] = (HVK_BMS_Sollmodus & (0x07U)) | ((HVK_DCDC_Sollmodus & (0x07U))
-  // << 3) | ((HVK_EKK_Sollmodus & (0x03U)) << 6);
   HVK_01[3] = (HVK_BMS_Sollmodus & (0x07U)) |
               ((HVK_DCDC_Sollmodus & (0x07U)) << 3) | ((0x00 & (0x03U)) << 6);
-  // HVK_01[4] = ((HVK_EKK_Sollmodus >> 2) & (0x01U)) | ((HVK_HVPTC_Sollmodus &
-  // (0x07U)) << 1) | ((HVK_HVLM_Sollmodus & (0x07U)) << 4) |
-  // ((HVK_HV_Netz_Warnungen & (0x01U)) << 7);
   HVK_01[4] = ((0x00 >> 2) & (0x01U)) | ((0x00 & (0x07U)) << 1) |
               ((HVK_HVLM_Sollmodus & (0x07U)) << 4) | ((0x00 & (0x01U)) << 7);
-  // HVK_01[5] = ((HVK_HV_Netz_Warnungen >> 1) & (0x01U)) | ((HV_Bordnetz_aktiv
-  // & (0x01U)) << 1) | ((HV_Bordnetz_Fehler & (0x01U)) << 2) |
-  // ((HVK_Gesamtst_Spgfreiheit & (0x03U)) << 3) | ((HVK_AktiveEntladung_Anf &
-  // (0x01U)) << 5);
   HVK_01[5] = ((0x00 >> 1) & (0x01U)) | ((HV_Bordnetz_aktiv & (0x01U)) << 1) |
               ((0x00 & (0x01U)) << 2) |
               ((HVK_Gesamtst_Spgfreiheit & (0x03U)) << 3) |
               ((0x00 & (0x01U)) << 5);
-  // HVK_01[6] = ((HVK_Iso_Messung_Start & (0x07U)) << 2);
-  // HVK_01[7] = ((HVK_DCDC_EKK_Sollmodus & (0x03U)) << 6);
 
-  // ZV_01[1] = (ZV_01_BZ & (0x0FU)) | ((ZV_FT_verriegeln & (0x01U)) << 4) |
-  // ((ZV_FT_entriegeln & (0x01U)) << 5) | ((ZV_BT_verriegeln & (0x01U)) << 6) |
-  // ((ZV_BT_entriegeln & (0x01U)) << 7);
   ZV_01[1] = (0x00 & (0x0FU)) | ((ZV_FT_verriegeln & (0x01U)) << 4) |
              ((ZV_FT_entriegeln & (0x01U)) << 5) |
              ((ZV_BT_verriegeln & (0x01U)) << 6) |
              ((ZV_BT_entriegeln & (0x01U)) << 7);
-  // ZV_01[2] = (ZV_HFS_verriegeln & (0x01U)) | ((ZV_HFS_entriegeln & (0x01U))
-  // << 1) | ((ZV_HBFS_verriegeln & (0x01U)) << 2) | ((ZV_HBFS_entriegeln &
-  // (0x01U)) << 3) | ((ZV_zentral_safen & (0x01U)) << 4) |
-  // ((ZV_zentral_entsafen & (0x01U)) << 5) | ((ZV_Spg_Anklappen & (0x01U)) <<
-  // 6) | ((ZV_Softtouch_betaetigt & (0x01U)) << 7); ZV_01[3] =
-  // (ZV_LED_Steuerung & (0x01U)) | ((ZV_LED_Uebernahme & (0x01U)) << 1) |
-  // ((ZV_auf_FT & (0x01U)) << 2) | ((ZV_zu_FT & (0x01U)) << 3) | ((ZV_auf_BT &
-  // (0x01U)) << 4) | ((ZV_zu_BT & (0x01U)) << 5) | ((ZV_auf_Kessy & (0x01U)) <<
-  // 6) | ((ZV_zu_Kessy & (0x01U)) << 7); ZV_01[4] = (ZV_auf_Funk & (0x01U)) |
-  // ((ZV_zu_Funk & (0x01U)) << 1) | ((VIP_Sensor_betaetigt & (0x01U)) << 2) |
-  // ((VIP_Freigabe & (0x01U)) << 3) | ((ZV_zu_Zeitl_Nachverr & (0x01U)) << 4) |
-  // ((ZV_HSK_entriegeln & (0x01U)) << 5) | ((ZV_HSK_verriegeln & (0x01U)) << 6)
-  // | ((ZV_Verdeck_zu & (0x01U)) << 7); ZV_01[5] = (ZV_Verdeck_auf & (0x01U)) |
-  // ((FH_FT_hoch & (0x01U)) << 1) | ((FH_FT_tief & (0x01U)) << 2) |
-  // ((FH_BT_hoch & (0x01U)) << 3) | ((FH_BT_tief & (0x01U)) << 4) |
-  // ((FH_HFS_hoch & (0x01U)) << 5) | ((FH_HFS_tief & (0x01U)) << 6) |
-  // ((FH_HBFS_hoch & (0x01U)) << 7); ZV_01[6] = (FH_HBFS_tief & (0x01U)) |
-  // ((BCM_Spg_Synchron & (0x01U)) << 1) | ((BCM_BF_Spg_Absenkung & (0x01U)) <<
-  // 2) | ((ZV_Signatur & (0x1FU)) << 3); ZV_01[7] = ((ZV_Signatur >> 5) &
-  // (0x3FU)) | ((ZV_entriegeln_Anf & (0x01U)) << 6) | ((ZV_auto_Ansteuerung &
-  // (0x01U)) << 7);
   ZV_01[7] = ((0x00 >> 5) & (0x3FU)) | ((ZV_entriegeln_Anf & (0x01U)) << 6) |
              ((0x00 & (0x01U)) << 7);
 
-  // ZV_02[1] = ((BCM_FH_Freigabe & (0x01U)) << 4) | ((BCM_Komfortfkt_Freigabe &
-  // (0x01U)) << 5) | ((BCM_HSK_Freigabe & (0x01U)) << 6) |
-  // ((BCM_Verdeck_Freigabe & (0x01U)) << 7); ZV_02[2] =
-  // (ZV_verriegelt_intern_ist & (0x01U)) | ((ZV_verriegelt_extern_ist &
-  // (0x01U)) << 1) | ((ZV_verriegelt_intern_soll & (0x01U)) << 2) |
-  // ((ZV_verriegelt_extern_soll & (0x01U)) << 3) | ((ZV_gesafet_extern_ist &
-  // (0x01U)) << 4) | ((ZV_gesafet_extern_soll & (0x01U)) << 5) |
-  // ((ZV_Einzeltuerentriegelung & (0x01U)) << 6) | ((ZV_Heckeinzelentriegelung
-  // & (0x01U)) << 7);
   ZV_02[2] = (ZV_verriegelt_intern_ist & (0x01U)) |
              ((ZV_verriegelt_extern_ist & (0x01U)) << 1) |
              ((ZV_verriegelt_intern_soll & (0x01U)) << 2) |
              ((ZV_verriegelt_extern_soll & (0x01U)) << 3) |
              ((0x00 & (0x01U)) << 4) | ((0x00 & (0x01U)) << 5) |
              ((0x00 & (0x01U)) << 6) | ((0x00 & (0x01U)) << 7);
-  // ZV_02[3] = (ZV_FT_offen & (0x01U)) | ((ZV_BT_offen & (0x01U)) << 1) |
-  // ((ZV_HFS_offen & (0x01U)) << 2) | ((ZV_HBFS_offen & (0x01U)) << 3) |
-  // ((ZV_HD_offen & (0x01U)) << 4) | ((ZV_HS_offen & (0x01U)) << 5) |
-  // ((IRUE_aktiv & (0x01U)) << 6) | ((DWA_aktiv & (0x01U)) << 7); ZV_02[4] =
-  // (HD_Hauptraste & (0x01U)) | ((HD_Vorraste & (0x01U)) << 1) |
-  // ((FFB_CarFinder & (0x01U)) << 6) | ((FFB_Komfortoeffnen & (0x01U)) << 7);
-  // ZV_02[5] = (FFB_Komfortschliessen & (0x01U)) | ((ZV_Schluessel_Zugang &
-  // (0x0FU)) << 2) | ((ZV_SafeFunktion_aktiv & (0x01U)) << 6) |
-  // ((FBS_Warn_Schluessel_Batt & (0x01U)) << 7); ZV_02[6] = (ZV_Oeffnungsmodus
-  // & (0x03U)) | ((HFS_verriegelt & (0x01U)) << 2) | ((HFS_gesafet & (0x01U))
-  // << 3) | ((HBFS_verriegelt & (0x01U)) << 4) | ((HBFS_gesafet & (0x01U)) <<
-  // 5) | ((ZV_ist_Zustand_verfuegbar & (0x01U)) << 6) | ((IRUE_Taster_Fkts_LED
-  // & (0x01U)) << 7);
   ZV_02[7] = (ZV_Tankklappe_offen & (0x01U)) | ((ZV_Rollo_auf & (0x01U)) << 1) |
              ((ZV_Rollo_zu & (0x01U)) << 2) | ((ZV_SAD_auf & (0x01U)) << 3) |
              ((ZV_SAD_zu & (0x01U)) << 4) |
              ((BCM_Tankklappensteller_Fehler & (0x01U)) << 5) |
              ((ZV_verriegelt_soll & (0x03U)) << 6);
 
-  // FCU_02[1] = ((FCU_Warn_H2_Konzentrat_Motorraum & (0x07U)) << 4) |
-  // ((FCU_nicht_verfuegbar & (0x01U)) << 7); FCU_02[2] =
-  // (FCU_Startstopp_Anforderung & (0x0FU)) | ((FCU_HV_Anf & (0x03U)) << 4) |
-  // ((FCU_Klima_Eingr & (0x03U)) << 6); FCU_02[3] = (FCU_IstModus & (0x1FU)) |
-  // ((FCU_Status_Spgfreiheit & (0x03U)) << 5) |
-  // ((FCU_Fehler_Leistungsreduzierung & (0x01U)) << 7); FCU_02[4] =
-  // (FCU_Fehler_Abschaltanforderung & (0x01U)) | ((FCU_Fehler_Notabschaltung &
-  // (0x01U)) << 1) | ((FCU_Fehler_Entladung_defekt & (0x03U)) << 2) |
-  // ((FCU_Fehler_Isofehler_I & (0x03U)) << 4) | ((FCU_Fehler_Isofehler_II &
-  // (0x03U)) << 6); FCU_02[5] = (FCU_OBD_Lampe_Anf & (0x01U)) |
-  // ((FCU_Absperrventil_schliessen & (0x03U)) << 1) |
-  // ((FCU_TK_Betankung_Anforderung & (0x01U)) << 3) | ((FCU_MinAbs_Leistung_ro
-  // & (0x0FU)) << 4);
   FCU_02[5] = (0x00 & (0x01U)) | ((0x00 & (0x03U)) << 1) |
               ((FCU_TK_Betankung_Anforderung & (0x01U)) << 3) |
               ((0x00 & (0x0FU)) << 4);
-  // FCU_02[6] = ((FCU_MinAbs_Leistung_ro >> 4) & (0x3FU)) |
-  // ((FCU_Ionenspuelung_aktiv & (0x03U)) << 6);
   FCU_02[7] = (FCU_TK_Freigabe_Tankklappe & (0x03U));
-
-  EM_HYB_11[1] = (0x00 & (0x0FU)) | ((EM1_Istmodus2 & (0x0FU)) << 4);
-  EM_HYB_11[2] = (0x00 & (0x07U)) | ((EM1_Status_Spgfreiheit & (0x03U)) << 3) |
-                 ((0x00 & (0x01U)) << 5);
 }
