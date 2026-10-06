@@ -26,7 +26,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-// Next param id (increase when adding new parameter!): 160
+// Next param id (increase when adding new parameter!): 164
 /*              category     name         unit       min     max     default id
  */
 #define PARAM_LIST                                                             \
@@ -75,6 +75,8 @@
   PARAM_ENTRY(CAT_GOVERNOR, govKi, "0.001%/rpm/tk", 0, 500, 2, 158)            \
   PARAM_ENTRY(CAT_GOVERNOR, govKd, "%/(rpm/tick)", 0, 20, 0, 160)              \
   PARAM_ENTRY(CAT_GOVERNOR, govImax, "%", 0, 100, 100, 159)                    \
+  PARAM_ENTRY(CAT_GOVERNOR, govFlt, "shift", 0, 6, 4, 162)                     \
+  PARAM_ENTRY(CAT_GOVERNOR, GovLog, ONOFF, 0, 1, 0, 163)                       \
   PARAM_ENTRY(CAT_THROTTLE, udcmin, "V", 0, 1000, 450, 19)                     \
   PARAM_ENTRY(CAT_THROTTLE, udclim, "V", 0, 1000, 520, 20)                     \
   PARAM_ENTRY(CAT_THROTTLE, idcmax, "A", 0, 5000, 5000, 21)                    \
@@ -207,6 +209,10 @@
   VALUE_ENTRY(potnom, "%", 2023)                                               \
   VALUE_ENTRY(govOut, "%", 2124)                                               \
   VALUE_ENTRY(govInt, "%", 2125)                                               \
+  VALUE_ENTRY(govErr, "rpm", 2126)                                             \
+  VALUE_ENTRY(govP, "%", 2127)                                                 \
+  VALUE_ENTRY(govD, "%", 2128)                                                 \
+  VALUE_ENTRY(potuser, "%", 2129)                                              \
   VALUE_ENTRY(dir, DIRS, 2024)                                                 \
   VALUE_ENTRY(tmphs, "°C", 2028)                                               \
   VALUE_ENTRY(tmpm, "°C", 2029)                                                \
@@ -282,7 +288,7 @@
   VALUE_ENTRY(DMA_ConsecFail, "", 2122)                                        \
   VALUE_ENTRY(HTM_State, "", 2123)
 
-// Next value Id: 2126
+// Next value Id: 2130
 
 // Dead params
 /*

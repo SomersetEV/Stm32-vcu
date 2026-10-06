@@ -55,6 +55,17 @@ float Throttle::govKd;
 float Throttle::govImax;
 float Throttle::ThrotRpmFilt;
 bool Throttle::noregenreq = 0;
+float Throttle::govSpeedFiltered = 0;
+float Throttle::lastGovSpeedFiltered = 0;
+float Throttle::govIntegral = 0;
+float Throttle::speedSlope = 0;
+int Throttle::govFlt = 4;
+int Throttle::govSpeedIn = 0;
+float Throttle::govSpeedErr = 0;
+float Throttle::govPTerm = 0;
+float Throttle::govDTerm = 0;
+uint8_t Throttle::govFlags = 0;
+float Throttle::potUser = 0;
 float UDCres;
 float IDCres;
 float UDCprevspnt = 0;
@@ -396,20 +407,23 @@ void Throttle::IdcLimitCommand(float &finalSpnt, float idc) {
 }
 
 void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
-  // govSpeedFiltered is local to the governor and intentionally named to NOT
-  // shadow Throttle::speedFiltered (used by CalcCruiseSpeed).
+  // govSpeedFiltered is the governor's own filter state and intentionally
+  // named to NOT shadow Throttle::speedFiltered (used by CalcCruiseSpeed).
   // Filtering is done in float: the previous integer filter quantised
   // per-tick changes to 0 or 1 rpm, starving the derivative term of signal.
-  static float govSpeedFiltered = 0;
-  static float lastGovSpeedFiltered = 0;
-  static float govIntegral = 0;
-  static float speedSlope = 0;
+  // The governor state is kept in static members so it can be logged.
+  float spntIn = finalSpnt;
+  uint8_t flags = 0;
 
-  // Filter time constant reduced from ~160ms (integer IIRFILTER, shift 4,
-  // 1/16 per tick) to ~30ms (IIRFILTERF weight 2: out = (new + 2*old)/3).
-  // The old lag ate most of the derivative term's phase lead at the ~1Hz
-  // disturbance frequency of a baler plunger, leaving kd ineffective.
-  govSpeedFiltered = IIRFILTERF(govSpeedFiltered, (float)speed, 4);
+  // IIRFILTERF(l, n, c) = (n + l * (2^c - 1)) / 2^c, i.e. a weight of 1/2^c
+  // on the new sample per 10 ms tick. Shift govFlt = 4 (default) is 1/16 per
+  // tick, a time constant of about 155 ms, the same as the old integer
+  // filter. Shift 3 is about 75 ms, 2 about 35 ms, 1 about 14 ms, 0 none.
+  // An earlier comment here claimed about 30 ms; the code has always used
+  // shift 4. A long lag eats the derivative term's phase lead at the ~1 Hz
+  // disturbance frequency of a baler plunger, so lower shifts are to be
+  // tried on the bench before changing the default.
+  govSpeedFiltered = IIRFILTERF(govSpeedFiltered, (float)speed, govFlt);
 
   float speederr = (float)speedLimit - govSpeedFiltered;
 
@@ -426,6 +440,7 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
   // starting and acceleration before the governor zone is reached
   if (speederr > (float)speedLimit / 2) {
     govIntegral = 0;
+    flags |= GOV_FLAG_INT_RESET;
   } else if (speederr < 0 || govProp + govIntegral < finalSpnt) {
     // Only integrate while over the limit or while the governor is the
     // binding constraint. Winding up while the driver's pedal is the limit
@@ -433,7 +448,12 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
     // requirement load-dependent. Freezing instead also keeps the
     // load-carrying integral through brief pedal lifts.
     govIntegral += speederr * govKi;
+    float unclamped = govIntegral;
     govIntegral = MAX(-govImax, MIN(govImax, govIntegral));
+    if (govIntegral != unclamped)
+      flags |= GOV_FLAG_INT_CLAMPED;
+  } else {
+    flags |= GOV_FLAG_INT_FROZEN;
   }
 
   float govOutput = govProp + govIntegral;
@@ -442,6 +462,15 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
   // govOut against potnom shows when the governor is the binding constraint.
   Param::SetFloat(Param::govOut, govOutput);
   Param::SetFloat(Param::govInt, govIntegral);
+
+  // Logging only (GovLog frames and spot values); does not feed back.
+  govSpeedIn = speed;
+  govSpeedErr = speederr;
+  govPTerm = speederr * govKp;
+  govDTerm = -speedSlope * govKd;
+  Param::SetFloat(Param::govErr, govSpeedErr);
+  Param::SetFloat(Param::govP, govPTerm);
+  Param::SetFloat(Param::govD, govDTerm);
 
   if (speederr >= 0) {
     // Below or at limit - governor limits positive throttle.
@@ -457,7 +486,12 @@ void Throttle::SpeedLimitCommand(float &finalSpnt, int speed) {
     govOutput = MIN(0.0f, govOutput);
     govOutput = MAX(govOutput, regenmax);
     finalSpnt = MIN(finalSpnt, govOutput);
+    flags |= GOV_FLAG_OVER;
   }
+
+  if (finalSpnt < spntIn)
+    flags |= GOV_FLAG_BINDING;
+  govFlags = flags;
 }
 
 float Throttle::AveragePos(float Pos) {

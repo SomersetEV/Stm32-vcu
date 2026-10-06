@@ -492,6 +492,10 @@ float ProcessThrottle(int speed) {
 
   finalSpnt = utils::GetUserThrottleCommand();
 
+  // Driver demand before any limit, for logging (GovLog, potuser)
+  Throttle::potUser = finalSpnt;
+  Param::SetFloat(Param::potuser, finalSpnt);
+
   /* No Cruise allowed
   if (Param::Get(Param::cruisespeed) > 0)
   {

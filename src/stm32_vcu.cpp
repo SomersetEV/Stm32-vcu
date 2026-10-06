@@ -76,6 +76,7 @@
 #include "isa_shunt.h"
 #include "kangoobms.h"
 #include "leafbms.h"
+#include "govlog.h"
 #include "leafinv.h"
 #include "linbus.h"
 #include "my_math.h"
@@ -609,6 +610,28 @@ static void ControlCabHeater(int opmode) {
   }
 }
 
+// Fast governor log frames (GovLog = On, run mode only). Logging only.
+static void SendGovLog(float potnom) {
+  static uint8_t counter = 0;
+  static int slowDiv = 0;
+  CanHardware *can = canInterface[Param::GetInt(Param::CanMapCan)];
+  uint32_t data[2];
+  uint8_t *bytes = (uint8_t *)data;
+
+  GovLog::Pack4A0(bytes, potnom);
+  can->Send(GovLog::ID_FAST_SPEED, data, 8);
+  GovLog::Pack4A1(bytes, counter++);
+  can->Send(GovLog::ID_FAST_TERMS, data, 8);
+
+  if (++slowDiv >= GovLog::SLOW_DIVIDER) {
+    slowDiv = 0;
+    GovLog::Pack4A2(bytes);
+    can->Send(GovLog::ID_SLOW_GAINS, data, 8);
+    GovLog::Pack4A3(bytes);
+    can->Send(GovLog::ID_SLOW_STATE, data, 8);
+  }
+}
+
 static void Ms10Task(void) {
   static uint32_t vehicleStartTime = 0;
 
@@ -629,6 +652,9 @@ static void Ms10Task(void) {
     torquePercent = utils::ProcessThrottle(
         ABS(previousSpeed)); // run the throttle reading and checks and then
                              // generate Potnom
+
+    if (Param::GetInt(Param::GovLog))
+      SendGovLog(torquePercent);
 
     // When requesting regen we need to be careful. If the car is not rolling
     // in the same direction as the selected gear, we will actually accelerate!
@@ -1303,6 +1329,7 @@ void Param::Change(Param::PARAM_NUM paramNum) {
   Throttle::govKi = Param::GetFloat(Param::govKi) * 0.001f;
   Throttle::govKd = Param::GetFloat(Param::govKd);
   Throttle::govImax = Param::GetFloat(Param::govImax);
+  Throttle::govFlt = Param::GetInt(Param::govFlt);
   Throttle::regenRamp = Param::GetFloat(Param::regenramp);
   Throttle::throttleRamp = Param::GetFloat(Param::throtramp);
   Throttle::throtmaxRev = Param::GetFloat(throtmaxRev);
