@@ -21,6 +21,7 @@
 
 #include "my_fp.h"
 #include "my_math.h"
+#include "govlog.h"
 #include "test_list.h"
 #include "throttle.h"
 #include <cstdio>
@@ -221,6 +222,135 @@ static void TestGovernorGolden() {
   ASSERT(mismatches == 0);
 }
 
+// GOVERNOR BEHAVIOUR AND LOGGING
+static void GovReset(float filteredSpeed) {
+  Throttle::govSpeedFiltered = filteredSpeed;
+  Throttle::lastGovSpeedFiltered = filteredSpeed;
+  Throttle::govIntegral = 0;
+  Throttle::speedSlope = 0;
+  Throttle::govFlt = 4;
+  Throttle::speedLimit = 2000;
+  Throttle::govKp = 30 * 0.01f;
+  Throttle::govKi = 2 * 0.001f;
+  Throttle::govKd = 0;
+  Throttle::govImax = 100;
+  Throttle::regenmax = -10;
+}
+
+static void TestGovIntegralResetBelowHalfLimit() {
+  GovReset(800);
+  Throttle::govIntegral = 12;
+  float spnt = 100;
+  Throttle::SpeedLimitCommand(spnt, 800); // error 1200 > limit / 2
+  ASSERT(Throttle::govIntegral == 0 &&
+         (Throttle::govFlags & Throttle::GOV_FLAG_INT_RESET) &&
+         !(Throttle::govFlags & Throttle::GOV_FLAG_BINDING) && spnt == 100);
+}
+
+static void TestGovRegenClampedAtRegenmaxAboveLimit() {
+  GovReset(2300);
+  float spnt = 100;
+  Throttle::SpeedLimitCommand(spnt, 2300); // 300 rpm over: output -90.6 %
+  ASSERT(spnt == Throttle::regenmax &&
+         (Throttle::govFlags & Throttle::GOV_FLAG_OVER) &&
+         (Throttle::govFlags & Throttle::GOV_FLAG_BINDING));
+}
+
+static void TestGovIntegralFrozenWhilePedalBinding() {
+  GovReset(1950);
+  Throttle::govIntegral = 5;
+  float spnt = 10; // governor output 15 + 5 = 20 is above the pedal
+  Throttle::SpeedLimitCommand(spnt, 1950);
+  ASSERT(Throttle::govIntegral == 5 && spnt == 10 &&
+         (Throttle::govFlags & Throttle::GOV_FLAG_INT_FROZEN) &&
+         !(Throttle::govFlags & Throttle::GOV_FLAG_BINDING));
+}
+
+static void TestGovIntegralClampFlag() {
+  GovReset(1990);
+  Throttle::govImax = 1;
+  Throttle::govIntegral = 0.995f;
+  float spnt = 100;
+  Throttle::SpeedLimitCommand(spnt, 1990); // 0.995 + 10 * 0.002 > 1
+  ASSERT(Throttle::govIntegral == 1 &&
+         (Throttle::govFlags & Throttle::GOV_FLAG_INT_CLAMPED) &&
+         (Throttle::govFlags & Throttle::GOV_FLAG_BINDING) && spnt > 3.99f &&
+         spnt < 4.01f);
+}
+
+static void TestGovLoggedTermsMatchOutput() {
+  GovReset(1900);
+  Throttle::govKd = 2;
+  Throttle::govIntegral = 3;
+  float spnt = 100;
+  Throttle::SpeedLimitCommand(spnt, 1980);
+  float out = Param::GetFloat(Param::govOut);
+  float sum = Throttle::govPTerm + Throttle::govDTerm + Throttle::govIntegral;
+  ASSERT(Throttle::govSpeedIn == 1980 && Throttle::govDTerm < 0 &&
+         sum > out - 0.05f && sum < out + 0.05f);
+}
+
+static void TestGovFilterShiftParameter() {
+  GovReset(1000);
+  float spnt = 100;
+  Throttle::SpeedLimitCommand(spnt, 2000); // (2000 + 1000 * 15) / 16
+  bool shift4 = Throttle::govSpeedFiltered == 1062.5f;
+  GovReset(1000);
+  Throttle::govFlt = 2;
+  spnt = 100;
+  Throttle::SpeedLimitCommand(spnt, 2000); // (2000 + 1000 * 3) / 4
+  ASSERT(shift4 && Throttle::govSpeedFiltered == 1250.0f);
+}
+
+static int16_t S16(const uint8_t *d) { return (int16_t)(d[0] | (d[1] << 8)); }
+static uint16_t U16(const uint8_t *d) { return (uint16_t)(d[0] | (d[1] << 8)); }
+
+static void TestGovLogFastFrames() {
+  uint8_t d[8];
+  Throttle::govSpeedIn = 1987;
+  Throttle::govSpeedErr = 12.375f;
+  Throttle::potUser = 87.654f;
+  GovLog::Pack4A0(d, -10.5f);
+  bool f0 = U16(d) == 1987 && S16(d + 2) == 99 && S16(d + 4) == 8765 &&
+            S16(d + 6) == -1050;
+
+  Throttle::govIntegral = -12.34f;
+  Throttle::govPTerm = 1e6f;  // saturates
+  Throttle::govDTerm = -1e6f; // saturates
+  Throttle::govFlags = 0x15;
+  GovLog::Pack4A1(d, 200);
+  bool f1 = S16(d) == -1234 && S16(d + 2) == 32767 && S16(d + 4) == -32768 &&
+            d[6] == 0x15 && d[7] == 200;
+
+  Throttle::govSpeedIn = 70000; // saturates at 65535
+  GovLog::Pack4A0(d, 0);
+  bool sat = U16(d) == 65535;
+  ASSERT(f0 && f1 && sat);
+}
+
+static void TestGovLogSlowFrames() {
+  uint8_t d[8];
+  Param::SetInt(Param::revlim, 2100);
+  Param::SetInt(Param::govKp, 30);
+  Param::SetInt(Param::govKi, 2);
+  Param::SetInt(Param::govKd, 2);
+  Param::SetInt(Param::govImax, 100);
+  Param::SetInt(Param::govFlt, 3);
+  Param::SetInt(Param::opmode, 1);
+  Param::SetInt(Param::dir, -1);
+  Param::SetInt(Param::TorqDerate, 0);
+  Param::SetInt(Param::regenmax, -10);
+  Param::SetInt(Param::throtramp, 10);
+  GovLog::Pack4A2(d);
+  bool f2 = U16(d) == 2100 && U16(d + 2) == 30 * 32 && U16(d + 4) == 2 * 32 &&
+            U16(d + 6) == 2 * 32;
+  GovLog::Pack4A3(d);
+  bool f3 = d[0] == 100 && d[1] == 3 && d[2] == 1 && (int8_t)d[3] == -1 &&
+            d[4] == 0 && (int8_t)d[5] == -10 && d[6] == 10 && d[7] == 0;
+  Param::SetInt(Param::dir, 1); // restore TestSetup
+  ASSERT(f2 && f3);
+}
+
 void ThrottleTest::RunTest() {
   TestSetup();
   TestThrottleTemperateOverMaxThrottleTo0();
@@ -234,4 +364,12 @@ void ThrottleTest::RunTest() {
   TestCalcThrottleIs100WhenMax();
   TestCalcThrottleIs100WhenOverMax();
   TestGovernorGolden(); // keep first of the governor tests, see above
+  TestGovIntegralResetBelowHalfLimit();
+  TestGovRegenClampedAtRegenmaxAboveLimit();
+  TestGovIntegralFrozenWhilePedalBinding();
+  TestGovIntegralClampFlag();
+  TestGovLoggedTermsMatchOutput();
+  TestGovFilterShiftParameter();
+  TestGovLogFastFrames();
+  TestGovLogSlowFrames();
 }
