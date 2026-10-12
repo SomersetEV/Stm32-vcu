@@ -573,8 +573,11 @@ static void ControlCabHeater(int opmode) {
   // preheat What about charge mode and timer mode?
   if ((opmode == MOD_RUN && Param::GetInt(Param::Control) >= 1) ||
       opmode == MOD_PREHEAT) {
-    IOMatrix::GetPinOut(IOMatrix::HEATERENABLE)
-        ->Set(); // Heater enable and coolant pump on
+    // Heater enable / coolant pump follows HeatReq
+    if (Param::GetBool(Param::HeatReq))
+      IOMatrix::GetPinOut(IOMatrix::HEATERENABLE)->Set();
+    else
+      IOMatrix::GetPinOut(IOMatrix::HEATERENABLE)->Clear();
     selectedHeater->SetTargetTemperature(50); // TODO: Currently does nothing
     selectedHeater->SetPower(Param::GetInt(Param::HeatPwr),
                              Param::GetBool(Param::HeatReq));
