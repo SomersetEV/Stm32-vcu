@@ -34,8 +34,8 @@ static const uint8_t powerSteps[3][3] = {
 
 // Derate thresholds, the heater cuts out internally at ~55C so taper down to
 // the lowest step before then rather than cycling max power on and off
-#define TAPER_MID_TEMP 45 // above this cap at ~3.3kW
-#define TAPER_LOW_TEMP 50 // above this cap at ~1.7kW
+#define TAPER_MID_TEMP 48 // above this cap at ~3.3kW
+#define TAPER_LOW_TEMP 54 // above this cap at ~1.7kW
 #define TAPER_HYST 3      // C below a threshold before stepping back up
 
 void mgCoolantHeater::SetPower(uint16_t power, bool HeatReq) {
