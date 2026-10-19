@@ -109,6 +109,7 @@
   PARAM_ENTRY(CAT_CHARGER, ChgEff, "%", 0, 100, 90, 121)                       \
   PARAM_ENTRY(CAT_CHARGER, CpMaxPwr, "W", 0, 12000, 0, 161)                    \
   PARAM_ENTRY(CAT_CHARGER, ConfigFoccci, ONOFF, 0, 1, 0, 133)                  \
+  PARAM_ENTRY(CAT_CHARGER, MGChgLimRaw, "dig", 1024, 2046, 2046, 162)          \
   PARAM_ENTRY(CAT_DCDC, DCdc_Type, DCDCTYPES, 0, 2, 0, 105)                    \
   PARAM_ENTRY(CAT_DCDC, DCSetPnt, "V", 9, 15, 14, 106)                         \
   PARAM_ENTRY(CAT_BMS, BMS_Timeout, "sec", 1, 120, 10, 91)                     \

@@ -22,15 +22,13 @@
 #ifndef MGgen2V2Lcharger_H
 #define MGgen2V2Lcharger_H
 
-/* Control of the Mitsubishi Outlander PHEV on board charger (OBC) and DCDC
- * Converter. */
+/* Control of the MG Gen2 on board charger (OBC) and DCDC converter. */
 
 #include "chargerhw.h"
 #include "hwinit.h"
 #include "my_fp.h"
 #include "my_math.h"
 #include "params.h"
-#include <libopencm3/stm32/timer.h>
 #include <stdint.h>
 
 class MGgen2V2Lcharger : public Chargerhw {
@@ -43,23 +41,24 @@ public:
   void SetCanInterface(CanHardware *c);
 
 private:
-  int opmode;
-  uint16_t setVolts, actVolts, termAmps;
+  uint16_t setVolts;
   uint8_t voltagesetpoint;
-  int16_t actAmps;
   float V2Ltimer = 0;
-  bool clearToStart = false, shutDownReq = false, pwmON = false;
+  bool clearToStart = false;
+  uint8_t offTick = 0; // Off() calls left to skip before the next send
   static uint8_t chgStatus, evseDuty;
   static uint8_t dcDcTimer, dcDcCounter;
   static uint8_t v2lCounter, v2lHeartbeat;
   static float dcBusV, temp_1, temp_2, ACVolts, DCAmps, ACAmps;
   static float LV_Volts, LV_Amps;
-  static uint16_t batteryVolts;
+
+  static bool PlugPresent();
 
   static void handle324(uint32_t data[2]);
   static void handle323(uint32_t data[2]);
   static void handle39F(uint32_t data[2]);
   static void handle33B(uint32_t data[2]);
+  static void handle33D(uint32_t data[2]);
   // static void handle38A(uint32_t data[2]);
 };
 
