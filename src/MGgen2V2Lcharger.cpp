@@ -19,8 +19,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <MGgen2V2Lcharger.h>
 #include "iomatrix.h"
+#include <MGgen2V2Lcharger.h>
 
 /* Control of the MG Gen 2 V2L charger.
  *
@@ -42,8 +42,9 @@ float MGgen2V2Lcharger::LV_Volts;
 float MGgen2V2Lcharger::LV_Amps;
 uint8_t MGgen2V2Lcharger::dcDcTimer = 0;
 uint8_t MGgen2V2Lcharger::dcDcCounter = 0;
-uint8_t MGgen2V2Lcharger::v2lCounter = 0;   // rolling 4-bit counter for 0x08E
-uint8_t MGgen2V2Lcharger::v2lHeartbeat = 0; // rolling counter for 0x297 full frame
+uint8_t MGgen2V2Lcharger::v2lCounter = 0; // rolling 4-bit counter for 0x08E
+uint8_t MGgen2V2Lcharger::v2lHeartbeat =
+    0; // rolling counter for 0x297 full frame
 static uint8_t PlugStat = 0;
 
 // Receive timeout: a value is only used if its frame was seen within the
@@ -107,25 +108,26 @@ static float PilotDutyToAmps(uint8_t duty) {
 //   After 0x33D D3=0x60 is seen:
 //     +1  0x29B D4 0x02 -> 0x00    (OEM 31.28s)
 //     +3  0x391 D5 0xB0 -> 0xD0    (OEM 31.45s)
-#define V2L_T_HVFLAG      3    // 0x396 D5 0x40 -> 0xC0
-#define V2L_T_D2_RUN      5    // 0x297 D2 0x02 -> 0x03 (OEM ~0.9 s)
-#define V2L_T_BMS_VALID   10   // 0x08E / 0x099 switch to live pattern
-#define V2L_T_D7_A        50   // 0x297 D7 high nibble 0xB -> 0xA (OEM ~4.8 s)
-#define V2L_REQ_TICK      100  // when we raise the V2L request (OEM: 14 s after HV, user-driven)
-#define V2L_REQ_LEN       5    // D2=0x23 window (OEM 500 ms)
+#define V2L_T_HVFLAG 3     // 0x396 D5 0x40 -> 0xC0
+#define V2L_T_D2_RUN 5     // 0x297 D2 0x02 -> 0x03 (OEM ~0.9 s)
+#define V2L_T_BMS_VALID 10 // 0x08E / 0x099 switch to live pattern
+#define V2L_T_D7_A 50      // 0x297 D7 high nibble 0xB -> 0xA (OEM ~4.8 s)
+#define V2L_REQ_TICK                                                           \
+  100 // when we raise the V2L request (OEM: 14 s after HV, user-driven)
+#define V2L_REQ_LEN 5 // D2=0x23 window (OEM 500 ms)
 // 0 = wait indefinitely for 0x33D D3==0x30 before enabling the output.
 // Set to N to fall back to a timed enable N ticks after the request
 // (the old behaviour) — NOT recommended, kept for experiment only.
 #define V2L_READY_TIMEOUT 0
 
-static uint8_t ccu33D_D3 = 0;       // last 0x33D D3 from the CCU (0x10/0x30/0x60)
-static bool v2lRequested = false;   // D1=0x01 latched, 0x46 announced
-static bool v2lReady = false;       // CCU showed 0x33D D3==0x30
-static bool v2lOutputOn = false;    // CCU showed 0x33D D3==0x60
-static uint8_t readyTick = 0;       // ticks since 0x30 seen (saturating)
-static uint8_t outputTick = 0;      // ticks since 0x60 seen (saturating)
-static uint8_t ccu099Counter = 0;   // 0x099 D2 counter
-static uint8_t chg394Counter = 0;   // 0x394 / 0x39B counter
+static uint8_t ccu33D_D3 = 0;     // last 0x33D D3 from the CCU (0x10/0x30/0x60)
+static bool v2lRequested = false; // D1=0x01 latched, 0x46 announced
+static bool v2lReady = false;     // CCU showed 0x33D D3==0x30
+static bool v2lOutputOn = false;  // CCU showed 0x33D D3==0x60
+static uint8_t readyTick = 0;     // ticks since 0x30 seen (saturating)
+static uint8_t outputTick = 0;    // ticks since 0x60 seen (saturating)
+static uint8_t ccu099Counter = 0; // 0x099 D2 counter
+static uint8_t chg394Counter = 0; // 0x394 / 0x39B counter
 
 static inline uint8_t xor7(const uint8_t *b) {
   return b[0] ^ b[1] ^ b[2] ^ b[3] ^ b[4] ^ b[5] ^ b[6];
@@ -379,14 +381,29 @@ void MGgen2V2Lcharger::Task100Ms() {
     // readyTick 4 (OEM 25.26s / 30.96s).
     bytes[0] = 0x28;
     if (send29CLimits) { // 22.0 A, 445.8 V
-      bytes[1] = 0x89; bytes[2] = 0x04; bytes[3] = 0x00;
-      bytes[4] = 0x00; bytes[5] = 0xDC; bytes[6] = 0x57; bytes[7] = 0x12;
+      bytes[1] = 0x89;
+      bytes[2] = 0x04;
+      bytes[3] = 0x00;
+      bytes[4] = 0x00;
+      bytes[5] = 0xDC;
+      bytes[6] = 0x57;
+      bytes[7] = 0x12;
     } else if (V2Ltimer >= V2L_REQ_TICK + V2L_REQ_LEN - 1) { // cleared
-      bytes[1] = 0x00; bytes[2] = 0x00; bytes[3] = 0x00;
-      bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00;
+      bytes[1] = 0x00;
+      bytes[2] = 0x00;
+      bytes[3] = 0x00;
+      bytes[4] = 0x00;
+      bytes[5] = 0x00;
+      bytes[6] = 0x00;
+      bytes[7] = 0x00;
     } else { // idle
-      bytes[1] = 0xFF; bytes[2] = 0x83; bytes[3] = 0xFF;
-      bytes[4] = 0x00; bytes[5] = 0xFF; bytes[6] = 0x7F; bytes[7] = 0xFF;
+      bytes[1] = 0xFF;
+      bytes[2] = 0x83;
+      bytes[3] = 0xFF;
+      bytes[4] = 0x00;
+      bytes[5] = 0xFF;
+      bytes[6] = 0x7F;
+      bytes[7] = 0xFF;
     }
     can->Send(0x29C, (uint32_t *)bytes, 8);
 
@@ -658,12 +675,12 @@ void MGgen2V2Lcharger::Task100Ms() {
 
 void MGgen2V2Lcharger::Off() {
 
-  V2Ltimer = 0;      // reset V2L timer
-  dcDcTimer = 0;     // reset DC-DC startup gate — forces re-sequencing on next RUN
-  dcDcCounter = 0;   // reset rolling counter
-  v2lCounter = 0;    // reset 0x08E counter
-  v2lHeartbeat = 0;  // reset 0x297 counter
-  ResetV2LState();   // forget the 0x33D handshake
+  V2Ltimer = 0;  // reset V2L timer
+  dcDcTimer = 0; // reset DC-DC startup gate — forces re-sequencing on next RUN
+  dcDcCounter = 0;  // reset rolling counter
+  v2lCounter = 0;   // reset 0x08E counter
+  v2lHeartbeat = 0; // reset 0x297 counter
+  ResetV2LState();  // forget the 0x33D handshake
 
   // Off() is called every 10 ms during the shutdown delay. Only send every
   // 10th call, so the shutdown frames go out at 100 ms like all the others.
