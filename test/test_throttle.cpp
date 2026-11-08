@@ -19,9 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "govlog.h"
 #include "my_fp.h"
 #include "my_math.h"
-#include "govlog.h"
 #include "test_list.h"
 #include "throttle.h"
 #include <cstdio>
@@ -120,7 +120,8 @@ static void TestCalcThrottleIs100WhenOverMax() {
 // d85e756 the governor state lives in function statics and cannot be reset.
 //
 // To re-record (only ever against unmodified governor code):
-//   make clean && make CPPFLAGS="-ggdb -I../include -I../libopeninv/include -DGOLDEN_RECORD"
+//   make clean && make CPPFLAGS="-ggdb -I../include -I../libopeninv/include
+//   -DGOLDEN_RECORD"
 //   ./test_vcu      (writes golden_governor.h in the current directory)
 static const int GOLDEN_TICKS = 500;
 
@@ -133,8 +134,10 @@ static int Triangle(int t, int amp, int step) {
   int period = 4 * amp / step;
   int p = t % period;
   int q = period / 4;
-  if (p < q) return p * step;
-  if (p < 3 * q) return (2 * q - p) * step;
+  if (p < q)
+    return p * step;
+  if (p < 3 * q)
+    return (2 * q - p) * step;
   return (p - 4 * q) * step;
 }
 
@@ -152,25 +155,25 @@ static void GoldenInput(int t, int &speed, float &throttle) {
     Throttle::govImax = 20;
   }
 
-  if (t < 100) {              // full throttle acceleration through the limit
+  if (t < 100) { // full throttle acceleration through the limit
     speed = t * 24;
     throttle = 100;
-  } else if (t < 200) {       // ripple around the limit, baler-like
+  } else if (t < 200) { // ripple around the limit, baler-like
     speed = 2000 + Triangle(t, 60, 6);
     throttle = 100;
-  } else if (t < 250) {       // pedal is the binding limit
+  } else if (t < 250) { // pedal is the binding limit
     speed = 1950 + t % 5;
     throttle = 10;
-  } else if (t < 300) {       // drop below half the limit: integral reset
+  } else if (t < 300) { // drop below half the limit: integral reset
     speed = MAX(0, 1950 - (t - 250) * 40);
     throttle = 100;
-  } else if (t < 400) {       // just under the limit: integral clamps at govImax
+  } else if (t < 400) { // just under the limit: integral clamps at govImax
     speed = 1990;
     throttle = 100;
-  } else if (t < 450) {       // over the limit: regen, negative clamp
+  } else if (t < 450) { // over the limit: regen, negative clamp
     speed = 2050;
     throttle = 100;
-  } else {                    // driver regen request below the limit
+  } else { // driver regen request below the limit
     speed = 1500;
     throttle = -5;
   }
@@ -196,28 +199,31 @@ static void TestGovernorGolden() {
     intRaw[t] = govInt;
 #else
     if (bits != goldenSpntBits[t] || govInt != goldenGovIntRaw[t]) {
-      if (first < 0) first = t;
+      if (first < 0)
+        first = t;
       mismatches++;
     }
 #endif
   }
 #ifdef GOLDEN_RECORD
   FILE *f = fopen("golden_governor.h", "w");
-  fprintf(f, "// Recorded by TestGovernorGolden from unmodified SpeedLimitCommand.\n");
+  fprintf(
+      f,
+      "// Recorded by TestGovernorGolden from unmodified SpeedLimitCommand.\n");
   fprintf(f, "static const uint32_t goldenSpntBits[GOLDEN_TICKS] = {\n");
   for (int t = 0; t < GOLDEN_TICKS; t++)
     fprintf(f, "%s0x%08X,%s", t % 6 == 0 ? "    " : " ", (unsigned)spntBits[t],
-           t % 6 == 5 || t == GOLDEN_TICKS - 1 ? "\n" : "");
+            t % 6 == 5 || t == GOLDEN_TICKS - 1 ? "\n" : "");
   fprintf(f, "};\nstatic const int32_t goldenGovIntRaw[GOLDEN_TICKS] = {\n");
   for (int t = 0; t < GOLDEN_TICKS; t++)
     fprintf(f, "%s%d,%s", t % 10 == 0 ? "    " : " ", (int)intRaw[t],
-           t % 10 == 9 || t == GOLDEN_TICKS - 1 ? "\n" : "");
+            t % 10 == 9 || t == GOLDEN_TICKS - 1 ? "\n" : "");
   fprintf(f, "};\n");
   fclose(f);
 #else
   if (mismatches)
-    cout << "Golden mismatch: " << mismatches << " ticks, first at tick " << first
-         << endl;
+    cout << "Golden mismatch: " << mismatches << " ticks, first at tick "
+         << first << endl;
 #endif
   ASSERT(mismatches == 0);
 }

@@ -80,19 +80,20 @@ public:
   static int govFlt; // speed filter shift, param govFlt (default 4)
 
   // Governor internals of the last SpeedLimitCommand call, for logging only.
-  static int govSpeedIn;   // speed passed to the governor, rpm
+  static int govSpeedIn;    // speed passed to the governor, rpm
   static float govSpeedErr; // speedLimit - filtered speed, rpm
   static float govPTerm;    // speederr * govKp, %
   static float govDTerm;    // -speedSlope * govKd, %
   static uint8_t govFlags;  // GOV_FLAG_* bits
-  static float potUser;     // user throttle before any limit, %, set by ProcessThrottle
+  static float
+      potUser; // user throttle before any limit, %, set by ProcessThrottle
 
   enum GovFlag {
-    GOV_FLAG_BINDING = 1,      // governor reduced the throttle this tick
-    GOV_FLAG_OVER = 2,         // speed over the limit
-    GOV_FLAG_INT_RESET = 4,    // integral reset, speed below half the limit
-    GOV_FLAG_INT_FROZEN = 8,   // integral neither reset nor updated
-    GOV_FLAG_INT_CLAMPED = 16  // integral clamped at +/- govImax
+    GOV_FLAG_BINDING = 1,     // governor reduced the throttle this tick
+    GOV_FLAG_OVER = 2,        // speed over the limit
+    GOV_FLAG_INT_RESET = 4,   // integral reset, speed below half the limit
+    GOV_FLAG_INT_FROZEN = 8,  // integral neither reset nor updated
+    GOV_FLAG_INT_CLAMPED = 16 // integral clamped at +/- govImax
   };
 
 private:
