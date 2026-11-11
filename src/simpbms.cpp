@@ -27,7 +27,43 @@
  * the BMS is actively sending data or not. This data can be
  * used to safely stop any charging process if the BMS is not
  * working correctly.
+ *
+ * The charge current limit (CCL) is not taken from the BMS. It is derived
+ * here from the min/max cell temperature using nominal NMC Li-ion charge
+ * C-rates for a 156Ah cell. Voltage derating is left to udclim and the
+ * BMS_VmaxLimit gate. The discharge limit (DCL) still comes from the BMS.
  */
+
+static const float CELL_CAPACITY_AH = 156.0f;
+
+// Nominal continuous charge C-rate against cell temperature. Linearly
+// interpolated between points, end values held beyond either end.
+static const struct {
+  float tempC;
+  float cRate;
+} chargeDerate[] = {
+    {-20.0f, 0.0f}, {0.0f, 0.0f},  {5.0f, 0.1f},  {10.0f, 0.3f}, {15.0f, 0.5f},
+    {25.0f, 1.0f},  {40.0f, 1.0f}, {45.0f, 0.5f}, {50.0f, 0.2f}, {55.0f, 0.0f},
+};
+static const int chargeDeratePoints =
+    sizeof(chargeDerate) / sizeof(chargeDerate[0]);
+
+// Return the allowed charge current in amps for a given cell temperature.
+static float TempChargeLimit(float tempC) {
+  if (tempC <= chargeDerate[0].tempC)
+    return chargeDerate[0].cRate * CELL_CAPACITY_AH;
+
+  for (int i = 1; i < chargeDeratePoints; i++) {
+    if (tempC <= chargeDerate[i].tempC) {
+      float t0 = chargeDerate[i - 1].tempC;
+      float t1 = chargeDerate[i].tempC;
+      float c0 = chargeDerate[i - 1].cRate;
+      float c1 = chargeDerate[i].cRate;
+      return (c0 + (c1 - c0) * (tempC - t0) / (t1 - t0)) * CELL_CAPACITY_AH;
+    }
+  }
+  return chargeDerate[chargeDeratePoints - 1].cRate * CELL_CAPACITY_AH;
+}
 
 void SimpBMS::SetCanInterface(CanHardware *c) {
   can = c;
@@ -60,9 +96,8 @@ bool SimpBMS::ChargeAllowed() {
   if (minTempC < Param::GetFloat(Param::BMS_TminLimit))
     return false;
 
-  // Refuse to charge if the current limit is zero. Limit is in 0.1A digits, so
-  // 5 digits is 0.5A.
-  if (chargeCurrentLimit < 5)
+  // Refuse to charge if the temperature derated limit is effectively zero.
+  if (chargeCurrentLimit < 0.5f)
     return false;
 
   // Otherwise, charging is permitted.
@@ -73,7 +108,7 @@ bool SimpBMS::ChargeAllowed() {
 float SimpBMS::MaxChargeCurrent() {
   if (!ChargeAllowed())
     return 0;
-  return chargeCurrentLimit * 0.1;
+  return chargeCurrentLimit;
 }
 
 // Return the maximum discharge current allowed by the BMS.
@@ -101,10 +136,9 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
     maxTempC = maxTemp - 273;
 
   } else if (id == 0x351) {
-    chargeCurrentLimit = data[2] | (data[3] << 8);    // CCL, 0.1A per digit
+    // CCL in data[2..3] is ignored, it is derived from temperature instead.
     dischargeCurrentLimit = data[4] | (data[5] << 8); // DCL, 0.1A per digit
-    // Reset timeout counter to the full timeout value. The Orion in this setup
-    // does not send 0x373, so the reset has to hang off a frame it does send.
+    // Reset timeout counter to the full timeout value.
     timeoutCounter = Param::GetInt(Param::BMS_Timeout) * 10;
   } else if (id == 0x356) {
     batteryVoltage = (data[0] | (data[1] << 8)) * 0.1; // comes in 0.1V scale
@@ -124,6 +158,12 @@ void SimpBMS::Task100Ms() {
   if (timeoutCounter > 0)
     timeoutCounter--;
 
+  // Derate the charge limit on temperature. The curve rises then falls, so its
+  // lowest value across the pack's temperature spread is always at either the
+  // min or the max cell temperature.
+  chargeCurrentLimit =
+      MIN(TempChargeLimit(minTempC), TempChargeLimit(maxTempC));
+
   // Update informational parameters.
   Param::SetInt(Param::BMS_ChargeLim, MaxChargeCurrent());
   Param::SetInt(Param::BMS_DischargeLim, MaxDischargeCurrent());
@@ -134,17 +174,18 @@ void SimpBMS::Task100Ms() {
     Param::SetFloat(Param::BMS_Tmin, minTempC);
     Param::SetFloat(Param::BMS_Tmax, maxTempC);
 
-    // Apply the BMS current limits to the drive current limits.
-    // idcmax is the positive (discharge) limit and so takes the DCL, idcmin
-    // the negative (regen, which charges the pack) limit and so takes the CCL.
+    // Apply the current limits to the drive current limits.
+    // idcmax is the positive (discharge) limit and so takes the DCL from the
+    // BMS, idcmin the negative (regen, which charges the pack) limit and so
+    // takes the temperature derated CCL.
     // IdcLimitCommand is fed ABS(idc) and picks its branch from the sign of the
     // torque request, so this mapping holds regardless of the sign convention
-    // used for idc itself. Both limits arrive at 0.1A per digit and need
-    // scaling. Only written while the BMS is actually talking - on a timeout we
-    // do nothing here and the user configured limits stay in force, so a CAN
-    // dropout cannot cut drive.
+    // used for idc itself. The DCL arrives at 0.1A per digit and needs scaling,
+    // the CCL is already in amps. Only written while the BMS is actually
+    // talking - on a timeout we do nothing here and the user configured limits
+    // stay in force, so a CAN dropout cannot cut drive.
     Param::SetFloat(Param::idcmax, MIN(dischargeCurrentLimit * 0.1f, 5000.0f));
-    Param::SetFloat(Param::idcmin, MAX(-chargeCurrentLimit * 0.1f, -5000.0f));
+    Param::SetFloat(Param::idcmin, MAX(-chargeCurrentLimit, -5000.0f));
   } else {
     Param::SetFloat(Param::BMS_Vmin, 0);
     Param::SetFloat(Param::BMS_Vmax, 0);

@@ -35,8 +35,9 @@ public:
 private:
   bool BMSDataValid();
   bool ChargeAllowed();
-  // CCL and DCL are sent by Simp as 0.1A per digit and stored the same way.
-  int chargeCurrentLimit = 0;
+  // CCL is derived locally from cell temperature, in amps.
+  float chargeCurrentLimit = 0;
+  // DCL is sent by the BMS as 0.1A per digit and stored the same way.
   int dischargeCurrentLimit = 0;
   int timeoutCounter = 0;
   float minCellV = 0;
