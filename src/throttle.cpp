@@ -62,6 +62,15 @@ static float SpeedFiltered = 0.0;
 
 static float regenlim = 0;
 
+// Regen current limiting on idcmin. Rather than a stateless proportional cut,
+// the allowed regen torque is integrated against the current headroom, so it
+// settles smoothly at the charge current limit instead of hunting on the
+// slowly updated idc measurement.
+static const float REGEN_KI = 0.005f;   // %/(A*10ms) integrator gain
+static const int REGEN_BLANK_TICKS = 30; // 300ms hold after regen starts
+static float idcRegenLim = 100.0f;       // allowed regen magnitude in %
+static int regenTicks = 0;               // 10ms ticks since regen started
+
 #define PedalPosArrLen 50
 static float PedalPos;
 static float LastPedalPos;
@@ -365,7 +374,21 @@ void Throttle::IdcLimitCommand(float &finalSpnt, float idc) {
   if (idcmax >
       0) // ignore if set to zero. useful for bench testing without isa shunt
   {
+    // Allowed regen charge current in amps and the regen limit that the old
+    // proportional law gave at zero current. The limit never starts a regen
+    // event above this value, so the first moment of regen is no stronger
+    // than before.
+    float chargeLim = -idcmin;
+    float regenSeed = MIN(100.0f, MAX(0.0f, chargeLim));
+
     if (finalSpnt >= 0) {
+      // Not regenerating. idc is drive current here, so do not learn from it.
+      // Relax the regen limit back towards the seed, capped at the seed so a
+      // high limit learnt at low speed is not carried into a high speed
+      // lift-off.
+      regenTicks = 0;
+      idcRegenLim = MIN(regenSeed, idcRegenLim + chargeLim * REGEN_KI);
+
       float idcerr = idcmax - idcFiltered;
       IDCres = idcerr * 1; // gain needs tuning
       IDCres = MAX(0, IDCres);
@@ -376,10 +399,21 @@ void Throttle::IdcLimitCommand(float &finalSpnt, float idc) {
       }
       finalSpnt = MIN(finalSpnt, IDCres);
     } else {
+      // idc is only fed as ABS() and updates slowly, so just after lift-off
+      // idcFiltered still holds drive current. Hold the limit for a short
+      // time before integrating so that does not count as regen current.
+      if (regenTicks < REGEN_BLANK_TICKS) {
+        regenTicks++;
+      } else {
+        float headroom = chargeLim - idcFiltered;
+        idcRegenLim += headroom * REGEN_KI;
+      }
 
-      float idcerr = idcmin + idcFiltered;
-      IDCres = idcerr * 1; // gain needs tuning
-      IDCres = MIN(0, IDCres);
+      if (chargeLim < 0.5f)
+        idcRegenLim = 0; // no charging allowed, so no regen
+      idcRegenLim = MAX(0.0f, MIN(100.0f, idcRegenLim));
+
+      IDCres = -idcRegenLim;
       if (finalSpnt < IDCres) // derate on idcmin
       {
         DerateReason |= 4;
