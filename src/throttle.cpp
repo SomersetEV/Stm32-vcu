@@ -51,6 +51,7 @@ float Throttle::idcmax;
 int Throttle::speedLimit;
 float Throttle::ThrotRpmFilt;
 bool Throttle::noregenreq = 0;
+bool Throttle::brakeMasked = false;
 float UDCres;
 float IDCres;
 float UDCprevspnt = 0;

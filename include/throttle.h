@@ -66,6 +66,9 @@ public:
   static float regenendRpm;
   static float ThrotRpmFilt;
   static bool noregenreq;
+  // True while brake_in cannot be trusted because the VCU is driving the
+  // regen brake lights. No positive torque is allowed while this is set.
+  static bool brakeMasked;
 
 private:
   static int speedFiltered;

@@ -207,6 +207,11 @@ static RearOutlanderInverter rearoutlanderInv;
 static LinBus *lin;
 static Preheater preheater;
 
+// Ticks (10ms) that brake_in stays masked after the regen brake light output
+// is cleared, to cover relay drop-out and lamp circuit decay.
+static const int REGEN_LIGHT_HOLDOFF_TICKS = 10;
+static int regenLightHold = 0;
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void Ms200Task(void) {
   int opmode = Param::GetInt(Param::opmode);
@@ -646,8 +651,11 @@ static void Ms10Task(void) {
   if (Param::GetInt(Param::potnom) < Param::GetInt(Param::RegenBrakeLight)) {
     // enable Brake Light Ouput
     IOMatrix::GetPinOut(IOMatrix::BRAKELIGHT)->Set();
+    regenLightHold = REGEN_LIGHT_HOLDOFF_TICKS;
   } else {
     IOMatrix::GetPinOut(IOMatrix::BRAKELIGHT)->Clear();
+    if (regenLightHold > 0)
+      regenLightHold--;
   }
 
   // speed = ABS(selectedInverter->GetMotorSpeed());//set motor rpm on interface
@@ -659,6 +667,23 @@ static void Ms10Task(void) {
                   utils::CalcVehicleSpeedMPH(speed)); // calculated road speed
                                                       // for the web interface
   utils::GetDigInputs(canInterface[Param::GetInt(Param::InverterCan)]);
+
+  // If brake_in is fed from the brake lamp circuit, the regen brake light
+  // output above reads back as a brake press. That makes CalcThrottle ignore
+  // the pedal, which holds regen on and latches the lights. While we are
+  // driving the lights (plus a holdoff) brake_in cannot be trusted, so mask
+  // it and let ProcessThrottle forbid positive torque instead. The mask can
+  // only start from regen and expires on its own, so with a throttle stuck
+  // on positive torque the brake is always read live and still overrides.
+  // brakeMasked and din_brake are updated together here so there is never a
+  // tick where drive torque is allowed with the brake unread.
+  bool brakeMasked =
+      opmode == MOD_RUN && regenLightHold > 0 &&
+      IOMatrix::GetPinOut(IOMatrix::BRAKELIGHT) != &DigIo::dummypin &&
+      Param::GetInt(Param::Inverter) != InvModes::OpenI;
+  if (brakeMasked)
+    Param::SetInt(Param::din_brake, 0);
+  Throttle::brakeMasked = brakeMasked;
 
   if (opmode == MOD_RUN ||
       opmode == MOD_CHARGE) // only set rev counter when in RUN or CHARGE

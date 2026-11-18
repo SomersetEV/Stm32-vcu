@@ -488,6 +488,12 @@ float ProcessThrottle(int speed) {
 
   finalSpnt = utils::GetUserThrottleCommand();
 
+  // While the regen brake lights mask the brake input we cannot tell whether
+  // the driver is braking, so the pedal may only reduce regen, never drive.
+  // Clamped before the limiters and ramp so no hidden positive ramp builds up.
+  if (Throttle::brakeMasked)
+    finalSpnt = MIN(finalSpnt, 0.0f);
+
   /* No Cruise allowed
   if (Param::Get(Param::cruisespeed) > 0)
   {
@@ -517,6 +523,10 @@ float ProcessThrottle(int speed) {
 
   finalSpnt = Throttle::RampThrottle(
       finalSpnt); // Move ramping as last step -intro V2.30A
+
+  // Belt and braces: never output drive torque while the brake is masked.
+  if (Throttle::brakeMasked)
+    finalSpnt = MIN(finalSpnt, 0.0f);
 
   // make sure the torque percentage is NEVER out of range
   if (finalSpnt < -100.0f)
