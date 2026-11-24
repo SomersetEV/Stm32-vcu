@@ -419,10 +419,20 @@ static void Ms100Task(void) {
     IOMatrix::GetPin(IOMatrix::REVERSELIGHT)->Clear();
   }
 
-  // Setting Run light
-  if (opmode == MOD_RUN) {
+  // Setting Run light. Flashes 0.5s on/0.5s off while a Leaf inverter
+  // restart is in progress.
+  static uint8_t runLightTicks = 0;
+  if (opmode == MOD_RUN && selectedInverter == &leafInv &&
+      leafInv.RestartInProgress()) {
+    if (++runLightTicks >= 5) {
+      runLightTicks = 0;
+      IOMatrix::GetPin(IOMatrix::RUNINDICATION)->Toggle();
+    }
+  } else if (opmode == MOD_RUN) {
+    runLightTicks = 0;
     IOMatrix::GetPin(IOMatrix::RUNINDICATION)->Set();
   } else {
+    runLightTicks = 0;
     IOMatrix::GetPin(IOMatrix::RUNINDICATION)->Clear();
   }
   // end lights
@@ -585,10 +595,21 @@ static void Ms100Task(void) {
   }
 }
 
+static void InverterPowerOn() {
+  // Don't re-energise the inverter while the Leaf startup supervisor has it
+  // switched off for a restart
+  if (selectedInverter == &leafInv && leafInv.PowerInhibit())
+    return;
+  DigIo::inv_out.Set();
+}
+
 static void ControlCabHeater(int opmode) {
   // Only run heater in run mode if enabled or timer set, also run is mode is
   // preheat What about charge mode and timer mode?
-  if ((opmode == MOD_RUN && Param::GetInt(Param::Control) >= 1) ||
+  // With a Leaf inverter, wait in RUN until the inverter has started up
+  // healthy, so the heater load isn't applied during its self test/restarts.
+  bool invReady = selectedInverter != &leafInv || leafInv.HeaterAllowed();
+  if ((opmode == MOD_RUN && Param::GetInt(Param::Control) >= 1 && invReady) ||
       opmode == MOD_PREHEAT) {
     IOMatrix::GetPin(IOMatrix::HEATERENABLE)
         ->Set(); // Heater enable and coolant pump on
@@ -615,6 +636,11 @@ static void Ms10Task(void) {
 
   ErrorMessage::SetTime(rtc_get_counter_val());
 
+  bool isLeaf = (selectedInverter == &leafInv);
+  if (isLeaf) // Leaf startup torque hold, rpm mask and fault restart
+    leafInv.StartupTask10Ms(opmode, Param::GetInt(Param::pot) <=
+                                        Param::GetInt(Param::potmin));
+
   selectedChargeInt->Task10Ms();
 
   if (Param::GetInt(Param::opmode) == MOD_RUN) //!!!THROTTLE CODE HERE//
@@ -622,6 +648,14 @@ static void Ms10Task(void) {
     torquePercent = utils::ProcessThrottle(
         ABS(previousSpeed)); // run the throttle reading and checks and then
                              // generate Potnom
+
+    if (isLeaf && leafInv.TorqueHold()) {
+      // Force zero torque during Leaf inverter startup/restart, and restart
+      // the throttle ramp from zero once released
+      torquePercent = 0;
+      Throttle::ResetRamp();
+      Param::SetFloat(Param::potnom, 0);
+    }
 
     // When requesting regen we need to be careful. If the car is not rolling
     // in the same direction as the selected gear, we will actually accelerate!
@@ -664,6 +698,8 @@ static void Ms10Task(void) {
   // speed = ABS(selectedInverter->GetMotorSpeed());//set motor rpm on interface
   // NO ABS allowed on speed as we need to know direction
   speed = selectedInverter->GetMotorSpeed(); // set motor rpm on interface
+  if (isLeaf && leafInv.SpeedMasked())
+    speed = 0; // ignore inverter rpm during its startup/restart
 
   Param::SetInt(Param::speed, speed);
   utils::GetDigInputs(canInterface[Param::GetInt(Param::InverterCan)]);
@@ -759,13 +795,13 @@ static void Ms10Task(void) {
   case MOD_PRECHARGE:
     if (!chargeMode) {
       if (selectedInverter != &openInv)
-        DigIo::inv_out.Set(); // inverter power on but not if we are in charge
-                              // mode and not if OI
+        InverterPowerOn(); // inverter power on but not if we are in charge
+                           // mode and not if OI
     } else if ((Param::GetInt(Param::ShuntType) == 0) &&
                selectedInverter == &leafInv) // Shunt 0 + Leaf is precharge
                                              // using leaf inverter voltage
     {
-      DigIo::inv_out.Set(); // inverter power on
+      InverterPowerOn(); // inverter power on
     }
     IOMatrix::GetPin(IOMatrix::NEGCONTACTOR)->Set();
     IOMatrix::GetPin(IOMatrix::COOLANTPUMP)->Set();
@@ -844,7 +880,7 @@ static void Ms10Task(void) {
                 // prevent too many contactors pulling amps at the same time
     if (rlyDly == 0) {
       DigIo::dcsw_out.Set();
-      DigIo::inv_out.Set(); // inverter power on
+      InverterPowerOn(); // inverter power on
     }
     Param::SetInt(Param::opmode, MOD_RUN);
     ErrorMessage::UnpostAll();

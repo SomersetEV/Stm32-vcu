@@ -40,16 +40,55 @@ public:
   int GetInverterState() { return error; }
   void SetCanInterface(CanHardware *c);
 
+  // Startup supervisor. Call every 10ms regardless of opmode.
+  // Holds torque at zero and masks motor speed after each inverter power-up,
+  // and power cycles the inverter (via inv_out) if it latches its startup
+  // fault while stationary.
+  void StartupTask10Ms(int opmode, bool throttleReleased);
+  bool TorqueHold() const {
+    return startState != STARTUP_OFF && startState != STARTUP_READY;
+  }
+  bool SpeedMasked() const { return TorqueHold(); }
+  bool PowerInhibit() const { return startState == STARTUP_RESTARTING; }
+  bool HeaterAllowed() const { return startState == STARTUP_READY; }
+  bool RestartInProgress() const { return restartInProgress; }
+
 private:
+  enum StartupState {
+    STARTUP_OFF = 0,
+    STARTUP_HOLD,
+    STARTUP_READY,
+    STARTUP_RESTARTING,
+    STARTUP_FAULT,
+    STARTUP_GAVEUP
+  };
+
   uint8_t nissan_crc(uint8_t *data);
   static int8_t fahrenheit_to_celsius(uint16_t fahrenheit);
+  void StartupArmHold();
   uint32_t lastRecv;
   int16_t speed;
+  int16_t lastValidSpeed;
+  bool speedValid;
   int16_t inv_temp;
   int16_t motor_temp;
   bool error;
   uint16_t voltage;
   int16_t final_torque_request;
+
+  // 0x1DA receive counter, used to detect the inverter going silent
+  volatile uint32_t rxCount;
+
+  // Startup supervisor state
+  StartupState startState;
+  bool restartInProgress;
+  uint16_t holdTicks;
+  uint16_t winTicks;
+  uint16_t offTicks;
+  uint16_t faultTicks;
+  uint16_t silentTicks;
+  uint32_t lastRxCount;
+  uint8_t restartCount;
 };
 
 #endif // LEAFINV_H

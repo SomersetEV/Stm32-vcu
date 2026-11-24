@@ -270,6 +270,12 @@ float Throttle::CalcThrottle(int potval, int potIdx, bool brkpedal) {
 }
 
 /**
+ * @brief Reset the ramped throttle state to 0, so that torque ramps up from
+ * zero again (e.g. after a forced zero torque period).
+ */
+void Throttle::ResetRamp() { throttleRamped = 0.0f; }
+
+/**
  * @brief Apply the throttle ramping parameters for ramping up and down.
  *
  * @param potnom Normalized throttle command in percent, range [-100.0, 100.0].

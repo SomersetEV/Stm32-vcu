@@ -36,6 +36,7 @@ public:
   static void IdcLimitCommand(float &finalSpnt, float idc);
   static void SpeedLimitCommand(float &finalSpnt, int speed);
   static float RampThrottle(float finalSpnt);
+  static void ResetRamp();
   static int potmin[2];
   static int potmax[2];
   static float regenRpm;
