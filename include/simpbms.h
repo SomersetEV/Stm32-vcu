@@ -35,6 +35,13 @@ public:
 private:
   bool BMSDataValid();
   bool ChargeAllowed();
+  void ClearBmsFaults();
+  // Orion DTC Flags #1 and #2, written from the CAN receive callback.
+  volatile uint16_t dtcFlags1 = 0;
+  volatile uint16_t dtcFlags2 = 0;
+  volatile bool dtcFresh = false;
+  // 100ms ticks before another clear request may be sent.
+  int dtcClearHold = 0;
   // CCL is derived locally from cell temperature, in amps.
   float chargeCurrentLimit = 0;
   // DCL is sent by the BMS as 0.1A per digit and stored the same way.

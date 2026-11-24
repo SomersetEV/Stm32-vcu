@@ -32,9 +32,27 @@
  * here from the min/max cell temperature using nominal NMC Li-ion charge
  * C-rates for a 156Ah cell. Voltage derating is left to udclim and the
  * BMS_VmaxLimit gate. The discharge limit (DCL) still comes from the BMS.
+ *
+ * Orion DTC screening: the Orion sends its DTC Flags #1/#2 on 0x35B and this
+ * module re-sends them on 0x35A for the screen, with P0A06 (Charge Limit
+ * Enforcement) and P0A08 (Charger Safety Relay) masked out. In charge mode, if
+ * those are the only codes set, an OBD2 "clear DTCs" request is sent so they
+ * do not block charging. Clearing wipes every code, so it is never sent while
+ * any other fault is present.
  */
 
 static const float CELL_CAPACITY_AH = 156.0f;
+
+// OBD2 physical request ID of the Orion BMS 2 (factory default).
+static const uint32_t ORION_OBD2_REQ_ID = 0x7E3;
+// DTC Flags #1 (bytes 0-1) and #2 (bytes 2-3), little endian, from the Orion.
+static const uint32_t ORION_DTC_IN_ID = 0x35B;
+// The same message with the ignored codes removed, for the screen.
+static const uint32_t ORION_DTC_OUT_ID = 0x35A;
+static const uint16_t DTC1_P0A08 = 0x0002; // Charger Safety Relay Fault
+static const uint16_t DTC2_P0A06 = 0x8000; // Charge Limit Enforcement Fault
+// Minimum gap between clear requests, in 100ms ticks.
+static const int DTC_CLEAR_INTERVAL = 50;
 
 // Nominal continuous charge C-rate against cell temperature. Linearly
 // interpolated between points, end values held beyond either end.
@@ -71,6 +89,7 @@ void SimpBMS::SetCanInterface(CanHardware *c) {
   can->RegisterUserMessage(0x351);
   can->RegisterUserMessage(0x356);
   can->RegisterUserMessage(0x355);
+  can->RegisterUserMessage(ORION_DTC_IN_ID);
 }
 
 bool SimpBMS::BMSDataValid() {
@@ -109,6 +128,12 @@ float SimpBMS::MaxChargeCurrent() {
   if (!ChargeAllowed())
     return 0;
   return chargeCurrentLimit;
+}
+
+// Send an OBD2 service 04 (clear DTCs) single frame request to the BMS.
+void SimpBMS::ClearBmsFaults() {
+  uint8_t bytes[8] = {0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  can->Send(ORION_OBD2_REQ_ID, bytes, 8);
 }
 
 // Return the maximum discharge current allowed by the BMS.
@@ -150,6 +175,12 @@ void SimpBMS::DecodeCAN(int id, uint8_t *data) {
 
   } else if (id == 0x355) {
     stateOfCharge = data[0] | (data[1] << 8); // comes in 1% scale
+  } else if (id == (int)ORION_DTC_IN_ID) {
+    // Only stored here, this runs in the CAN receive callback. Forwarded and
+    // acted on in Task100Ms.
+    dtcFlags1 = data[0] | (data[1] << 8);
+    dtcFlags2 = data[2] | (data[3] << 8);
+    dtcFresh = true;
   }
 }
 
@@ -157,6 +188,32 @@ void SimpBMS::Task100Ms() {
   // Decrement timeout counter.
   if (timeoutCounter > 0)
     timeoutCounter--;
+
+  if (dtcClearHold > 0)
+    dtcClearHold--;
+
+  if (dtcFresh) {
+    dtcFresh = false;
+    uint16_t raw1 = dtcFlags1;
+    uint16_t raw2 = dtcFlags2;
+    uint16_t out1 = raw1 & ~DTC1_P0A08;
+    uint16_t out2 = raw2 & ~DTC2_P0A06;
+
+    // Forward to the screen with the ignored codes removed.
+    uint8_t bytes[8] = {(uint8_t)(out1 & 0xFF), (uint8_t)(out1 >> 8),
+                        (uint8_t)(out2 & 0xFF), (uint8_t)(out2 >> 8),
+                        0, 0, 0, 0};
+    can->Send(ORION_DTC_OUT_ID, bytes, 4);
+
+    // Clear only in charge mode, and only if the ignored codes are the only
+    // ones set. In other modes they are just hidden from the screen.
+    bool ignoredSet = (raw1 & DTC1_P0A08) || (raw2 & DTC2_P0A06);
+    if (Param::GetInt(Param::opmode) == MOD_CHARGE && ignoredSet &&
+        out1 == 0 && out2 == 0 && dtcClearHold == 0) {
+      ClearBmsFaults();
+      dtcClearHold = DTC_CLEAR_INTERVAL;
+    }
+  }
 
   // Derate the charge limit on temperature. The curve rises then falls, so its
   // lowest value across the pack's temperature spread is always at either the
