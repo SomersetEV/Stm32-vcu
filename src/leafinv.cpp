@@ -22,23 +22,11 @@
 
 #include "leafinv.h"
 #include "NissLeafMng.h"
-#include "digio.h"
 #include "my_fp.h"
 #include "my_math.h"
 #include "params.h"
 #include "stm32_can.h"
 #include "utils.h"
-
-// Startup supervisor timings, in 10ms ticks
-#define INV_START_HOLD_TICKS 300   // 3s torque hold + rpm mask after power-up
-#define INV_RESTART_WIN_TICKS 1000 // 10s window after power-up for auto restart
-#define INV_RESTART_OFF_TICKS 300  // 3s inverter 12V off time
-#define INV_SILENT_TICKS 50        // 0x1DA must be silent 500ms before power on
-#define INV_FAULT_DEBOUNCE 20      // error flag must persist 200ms
-#define INV_RESTART_MAX 5          // restart attempts per key cycle
-#define INV_RESTART_MAX_RPM 100    // only restart below this motor speed
-#define INV_NOT_SWITCHED_TICKS 500 // 0x1DA still present 5s after off time:
-                                   // inv_out does not power the inverter
 
 /*Info on running Leaf Gen 2 PDM
 IDs required :
@@ -82,23 +70,12 @@ void LeafINV::DecodeCAN(int id, uint32_t data[2]) {
       Param::SetFloat(Param::udc, voltage);
     }
 
+    int16_t parsed_speed = (bytes[4] << 7) | bytes[5] >> 1;
+    if (parsed_speed > 0x3fff)
+      parsed_speed -= 0x7fff; // 15 bit signed conversion
+    // speed = (parsed_speed == 0x7fff ? 0 : parsed_speed);//LEAF MOTOR RPM
+    speed = parsed_speed;
     error = (bytes[6] & 0xb0) != 0x00; // INVERTER ERROR STATE
-
-    // During its ~260ms power-up self test the inverter sends 0x7FFE/0x7FFF
-    // in bytes 4-5, which would otherwise decode as 16383rpm.
-    if (bytes[4] == 0x7F && bytes[5] >= 0xFE) {
-      speed = 0;
-      speedValid = false;
-    } else {
-      int16_t parsed_speed = (bytes[4] << 7) | bytes[5] >> 1;
-      if (parsed_speed > 0x3fff)
-        parsed_speed -= 0x7fff; // 15 bit signed conversion
-      speed = parsed_speed;
-      speedValid = true;
-      if (!error)
-        lastValidSpeed = speed; // faulted frames report 0rpm, ignore them
-    }
-    rxCount++;
 
   } else if (id == 0x55A) // THIS MSG CONTAINS INV TEMP AND MOTOR TEMP
   {
@@ -131,116 +108,6 @@ void LeafINV::Task100Ms() // Always ran
 {
   // Inverter calling of 100ms VCM task takes precedences over PDM
   NissLeafMng::Task100Ms();
-}
-
-void LeafINV::StartupArmHold() {
-  startState = STARTUP_HOLD;
-  holdTicks = INV_START_HOLD_TICKS;
-  winTicks = INV_RESTART_WIN_TICKS;
-  faultTicks = 0;
-}
-
-/*
- * Leaf inverter startup supervisor, called every 10ms.
- *
- * After each inverter power-up the torque request is held at 0 and the motor
- * speed is masked to 0 for INV_START_HOLD_TICKS, and until the inverter
- * reports a valid speed with no error and the throttle is released.
- *
- * At full charge the inverter can latch a fault ~0.3-1s after power-up which
- * only clears with a 12V power cycle. If that happens inside the startup
- * window while stationary, inv_out is switched off for INV_RESTART_OFF_TICKS
- * (and until 0x1DA stops), then the main state machine powers it back on.
- */
-void LeafINV::StartupTask10Ms(int opmode, bool throttleReleased) {
-  if (opmode != MOD_RUN) {
-    startState = STARTUP_OFF;
-    restartInProgress = false;
-    restartCount = 0;
-    faultTicks = 0;
-    return;
-  }
-
-  if (startState == STARTUP_OFF)
-    StartupArmHold(); // just entered RUN
-
-  // Track whether the inverter is talking
-  uint32_t rx = rxCount;
-  if (rx != lastRxCount) {
-    lastRxCount = rx;
-    silentTicks = 0;
-  } else if (silentTicks < 0xFFFF) {
-    silentTicks++;
-  }
-  bool invAlive = silentTicks < INV_SILENT_TICKS;
-
-  if (winTicks > 0)
-    winTicks--;
-
-  switch (startState) {
-  case STARTUP_HOLD:
-  case STARTUP_READY:
-    if (error && invAlive) {
-      if (faultTicks < 0xFFFF)
-        faultTicks++;
-    } else {
-      faultTicks = 0;
-    }
-
-    if (faultTicks >= INV_FAULT_DEBOUNCE) {
-      if (winTicks > 0 && ABS(lastValidSpeed) < INV_RESTART_MAX_RPM &&
-          restartCount < INV_RESTART_MAX) {
-        startState = STARTUP_RESTARTING;
-        restartInProgress = true;
-        offTicks = 0;
-        DigIo::inv_out.Clear(); // inverter 12V off
-      } else {
-        startState =
-            (restartCount >= INV_RESTART_MAX) ? STARTUP_GAVEUP : STARTUP_FAULT;
-        restartInProgress = false;
-        ErrorMessage::Post(ERR_INVFAULT);
-      }
-      break;
-    }
-
-    if (startState == STARTUP_HOLD) {
-      if (holdTicks > 0) {
-        holdTicks--;
-      } else if (invAlive && speedValid && !error && throttleReleased) {
-        startState = STARTUP_READY;
-        restartInProgress = false;
-      }
-    }
-    break;
-
-  case STARTUP_RESTARTING:
-    DigIo::inv_out.Clear(); // keep inverter 12V off
-    if (offTicks < 0xFFFF)
-      offTicks++;
-
-    if (offTicks >= INV_RESTART_OFF_TICKS && !invAlive) {
-      // Inverter is fully off. Forget its old state and let the main state
-      // machine power it back on.
-      restartCount++;
-      error = false;
-      speedValid = false;
-      lastValidSpeed = 0;
-      StartupArmHold();
-    } else if (offTicks >= INV_RESTART_OFF_TICKS + INV_NOT_SWITCHED_TICKS) {
-      // Still talking long after power was removed: inv_out isn't what
-      // powers this inverter, so a restart can't work.
-      startState = STARTUP_GAVEUP;
-      restartInProgress = false;
-      ErrorMessage::Post(ERR_INVFAULT);
-    }
-    break;
-
-  case STARTUP_FAULT:
-  case STARTUP_GAVEUP:
-  case STARTUP_OFF:
-  default:
-    break; // torque stays held until the next key cycle
-  }
 }
 
 int8_t LeafINV::fahrenheit_to_celsius(uint16_t fahrenheit) {
