@@ -1,0 +1,7 @@
+/obj
+stm32_sboxbms
+stm32_sboxbms.bin
+stm32_sboxbms.hex
+stm32_sboxbms.map
+test/*.o
+test/test_sboxbms

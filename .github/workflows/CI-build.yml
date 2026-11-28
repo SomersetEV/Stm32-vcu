@@ -50,3 +50,18 @@ jobs:
       - name: Run unit tests on host
         run: |
           test/test_vcu
+
+      - name: Build sboxbms firmware (Zombie hardware as S-Box + SimpBMS)
+        run: |
+          make -C sboxbms
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sboxbms firmware
+          path: |
+            sboxbms/stm32_sboxbms.bin
+            sboxbms/stm32_sboxbms.hex
+
+      - name: Build and run sboxbms unit tests on host
+        run: |
+          make -C sboxbms test
